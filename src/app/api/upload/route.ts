@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
 import ImageKit from "imagekit";
 
-const imagekit = new ImageKit({
-  publicKey: process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY!,
-  privateKey: process.env.IMAGEKIT_PRIVATE_KEY!,
-  urlEndpoint: process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT!,
-});
+let imagekitInstance: ImageKit | null = null;
+
+function getImageKit() {
+  if (!imagekitInstance) {
+    imagekitInstance = new ImageKit({
+      publicKey: process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY || "placeholder_public_key",
+      privateKey: process.env.IMAGEKIT_PRIVATE_KEY || "placeholder_private_key",
+      urlEndpoint: process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT || "https://ik.imagekit.io/placeholder",
+    });
+  }
+  return imagekitInstance;
+}
 
 export async function POST(request: Request) {
   try {
@@ -19,6 +26,7 @@ export async function POST(request: Request) {
     const buffer = await file.arrayBuffer();
     const base64 = Buffer.from(buffer).toString("base64");
 
+    const imagekit = getImageKit();
     const response = await imagekit.upload({
       file: base64,
       fileName: file.name,
