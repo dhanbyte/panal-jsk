@@ -270,7 +270,7 @@ export default function PublicStore() {
             </button>
 
             {/* Modal Image & Video Carousel */}
-            <div className="w-full md:w-1/2 bg-amber-50 flex flex-col relative h-[40vh] md:h-auto">
+            <div className="w-full md:w-1/2 bg-amber-50 flex flex-col relative h-[75vh] md:h-auto">
               <div className="flex-1 overflow-hidden relative">
                 {activeImageIndex === 999 && selectedProduct.videoUrl ? (
                   <video
