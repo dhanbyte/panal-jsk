@@ -83,10 +83,16 @@ export default function PublicStore() {
     return matchesSearch && matchesCategory;
   });
 
+  const getFormattedWaNumber = () => {
+    let num = whatsappNumber.replace(/\D/g, "");
+    return num.length === 10 ? "91" + num : num;
+  };
+
   const getWhatsAppLink = (product: Product) => {
     const displayPrice = product.discountPrice ? product.discountPrice : product.price;
-    const text = `Hello JSK Art Jewellery, I am interested in this product:\n\n*Name:* ${product.name}\n*Price:* ₹${displayPrice.toLocaleString("en-IN")}\n*Category:* ${product.category}\n*Product ID:* ${product.id}\n\nPlease share more details.`;
-    return `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(text)}`;
+    const prodImage = product.imageUrls?.[0] || product.imageUrl || "";
+    const text = `Hello JSK Art Jewellery, I am interested in this product:\n\n*Name:* ${product.name}\n*Price:* ₹${displayPrice.toLocaleString("en-IN")}\n*Category:* ${product.category}\n*Product ID:* ${product.id}\n*Image Link:* ${prodImage}\n\nPlease share more details.`;
+    return `https://wa.me/${getFormattedWaNumber()}?text=${encodeURIComponent(text)}`;
   };
 
   return (
@@ -240,7 +246,7 @@ export default function PublicStore() {
 
       {/* Floating WhatsApp Button */}
       <a
-        href={`https://wa.me/${whatsappNumber}`}
+        href={`https://wa.me/${getFormattedWaNumber()}`}
         target="_blank"
         rel="noopener noreferrer"
         className="fixed bottom-6 right-6 z-50 bg-[#25D366] hover:bg-[#20b858] text-white p-4 rounded-full shadow-xl hover:scale-110 transition-transform duration-300 flex items-center justify-center group"
@@ -264,7 +270,7 @@ export default function PublicStore() {
             </button>
 
             {/* Modal Image & Video Carousel */}
-            <div className="w-full md:w-1/2 bg-amber-50 flex flex-col relative aspect-square md:aspect-auto">
+            <div className="w-full md:w-1/2 bg-amber-50 flex flex-col relative h-[40vh] md:h-auto">
               <div className="flex-1 overflow-hidden relative">
                 {activeImageIndex === 999 && selectedProduct.videoUrl ? (
                   <video
@@ -391,7 +397,7 @@ export default function PublicStore() {
             <h4 className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Quick Links</h4>
             <div className="flex flex-col space-y-3">
               <button onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})} className="text-sm text-amber-200/80 hover:text-white text-left transition-colors">Shop Collection</button>
-              <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer" className="text-sm text-amber-200/80 hover:text-white text-left transition-colors">WhatsApp Support</a>
+              <a href={`https://wa.me/${getFormattedWaNumber()}`} target="_blank" rel="noopener noreferrer" className="text-sm text-amber-200/80 hover:text-white text-left transition-colors">WhatsApp Support</a>
             </div>
           </div>
         </div>
