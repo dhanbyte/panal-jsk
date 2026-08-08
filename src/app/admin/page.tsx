@@ -772,29 +772,6 @@ export default function AdminDashboard() {
     return `JSK-${String(maxNum + 1).padStart(3, '0')}`;
   };
 
-  const handleWipeDatabase = async () => {
-    if(!confirm("Are you sure you want to permanently delete EVERYTHING (Products, Bills, and Purchases)? This cannot be undone!")) return;
-    setLoadingData(true);
-    try {
-      const pSnap = await getDocs(collection(db, "products"));
-      await Promise.all(pSnap.docs.map(d => deleteDoc(doc(db, "products", d.id))));
-      
-      const bSnap = await getDocs(collection(db, "bills"));
-      await Promise.all(bSnap.docs.map(d => deleteDoc(doc(db, "bills", d.id))));
-
-      const puSnap = await getDocs(collection(db, "purchases"));
-      await Promise.all(puSnap.docs.map(d => deleteDoc(doc(db, "purchases", d.id))));
-
-      fetchData();
-      alert("Database wiped successfully! Everything is now 0.");
-    } catch(e) {
-      console.error(e);
-      alert("Failed to wipe DB.");
-    } finally {
-      setLoadingData(false);
-    }
-  };
-
   // Billing Item Handlers
   const addBillItem = () => {
     setBillItems([...billItems, { name: "", price: 0, quantity: 1, purchasePrice: 0, cgstRate: defaultGst.cgst, sgstRate: defaultGst.sgst, igstRate: defaultGst.igst }]);
@@ -1448,6 +1425,43 @@ export default function AdminDashboard() {
     }
   };
 
+  // Delete bill and restore stock
+  const handleDeleteBill = async (bill: any) => {
+    if (!window.confirm(`Are you sure you want to delete Invoice No: ${bill.billNo}? This will restore stock for the items.`)) return;
+
+    try {
+      // 1. Restore stock for each item in the bill
+      if (bill.items && Array.isArray(bill.items)) {
+        for (const item of bill.items) {
+          let matchingProd = null;
+          if (item.productId) {
+            matchingProd = products.find(p => p.id === item.productId);
+          } else {
+            matchingProd = products.find(p => p.name.trim().toLowerCase() === item.name.trim().toLowerCase());
+          }
+
+          if (matchingProd) {
+            const newStock = matchingProd.stock + (Number(item.quantity) || 0);
+            const newSold = Math.max(0, (matchingProd.soldCount || 0) - (Number(item.quantity) || 0));
+            await updateDoc(doc(db, "products", matchingProd.id), {
+              stock: newStock,
+              soldCount: newSold
+            });
+          }
+        }
+      }
+
+      // 2. Delete the bill document
+      await deleteDoc(doc(db, "bills", bill.id));
+
+      fetchData();
+      alert("Bill deleted and stock restored successfully!");
+    } catch (err) {
+      console.error(err);
+      alert("Error deleting bill.");
+    }
+  };
+
   const downloadTallyCSV = () => {
     const headers = [
       "Date",
@@ -1814,12 +1828,6 @@ export default function AdminDashboard() {
               <div className="space-y-8 animate-fade-in">
                 <div className="flex justify-between items-center">
                   <h2 className="font-serif font-black text-2xl md:text-3xl text-amber-950">Overview Dashboard</h2>
-                  <button 
-                    onClick={handleWipeDatabase}
-                    className="text-xs bg-red-100 hover:bg-red-200 text-red-900 border border-red-200 px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer"
-                  >
-                    ⚠ Wipe All Products
-                  </button>
                 </div>
 
                 {/* Grid cards */}
@@ -2950,7 +2958,7 @@ export default function AdminDashboard() {
                       ) : (
                         <>
                           <Printer size={16} />
-                          <span>Save & Print A4 Invoice</span>
+                          <span>Save & Print A6 Invoice</span>
                         </>
                       )}
                     </button>
@@ -3274,7 +3282,7 @@ export default function AdminDashboard() {
                                       className="inline-flex items-center space-x-1 text-[10px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1.5 rounded transition-all cursor-pointer"
                                     >
                                       <Printer size={10} />
-                                      <span>Print A4</span>
+                                      <span>Print A6</span>
                                     </button>
                                     <button
                                       onClick={() => {
@@ -3294,8 +3302,17 @@ export default function AdminDashboard() {
                                       <span>Print Thermal</span>
                                     </button>
                                   </div>
-                                )}
-                              </td>
+                                 )}
+                                 {tx.type === "Sale" && (
+                                   <button
+                                     onClick={() => handleDeleteBill(tx)}
+                                     className="inline-flex items-center space-x-1 text-[10px] font-bold text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1.5 rounded transition-all cursor-pointer mt-1"
+                                   >
+                                     <Trash2 size={10} />
+                                     <span>Delete</span>
+                                   </button>
+                                 )}
+                               </td>
                             </tr>
                           ))}
                         </tbody>
@@ -4590,10 +4607,10 @@ export default function AdminDashboard() {
       {/* Printable A4 Bill Area (GST Tax Invoice) */}
       {printMode === "a4-bill" && activePrintBill && (
         <div id="printable-a4-bill-area" style={{display:'none'}} className="bg-white">
-          <div className="w-[210mm] h-[297mm] overflow-hidden bg-[#faf8f5] p-[10mm] font-sans text-amber-950 flex flex-col box-border" style={{fontSize: billFontSize === 'small' ? '11px' : billFontSize === 'large' ? '15px' : billFontSize === 'xlarge' ? '17px' : '13px'}}>
+          <div className="w-[105mm] min-h-[148.5mm] h-max overflow-visible bg-[#faf8f5] p-[2mm] leading-tight font-sans text-amber-950 flex flex-col box-border" style={{fontSize: billFontSize === 'small' ? '6px' : billFontSize === 'large' ? '9px' : billFontSize === 'xlarge' ? '10px' : '7.5px'}}>
             
             {/* Brand Header */}
-            <div className="flex justify-between items-start pb-2 border-b-[4px] border-amber-800 shrink-0">
+            <div className="flex justify-between items-start pb-1 border-b-[2px] border-amber-800 shrink-0">
               <div className="flex items-center space-x-3">
                 {businessLogo ? (
                   <img src={businessLogo} alt="Logo" className="w-14 h-14 object-contain rounded-md border-2 border-amber-200 p-1 bg-white" />
@@ -4609,14 +4626,10 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* GST Invoice Header Banner */}
-            <div className="text-center my-3 bg-amber-50 py-1.5 border border-amber-200/60 rounded-lg shadow-sm shrink-0">
-              <div className="font-black text-lg tracking-widest text-amber-900 leading-tight">GST INVOICE</div>
-              <div className="text-[0.7em] text-amber-700 italic font-medium leading-tight">(ORIGINAL FOR RECIPIENT)</div>
-            </div>
+
 
             {/* Details block */}
-            <div className="grid grid-cols-2 gap-4 pb-3 border-b-2 border-amber-100 text-[0.9em] shrink-0">
+            <div className="grid grid-cols-2 gap-2 pb-1.5 border-b border-amber-100 text-[0.8em] mt-1 shrink-0">
               <div>
                 <div className="font-bold text-amber-800 mb-1 uppercase tracking-wider text-[0.8em]">SUPPLIER</div>
                 <div className="font-black text-[1.1em] text-amber-950 leading-tight">{businessName}</div>
@@ -4653,13 +4666,13 @@ export default function AdminDashboard() {
             </div>
 
             {/* Buyer Details */}
-            <div className="py-2.5 border-b-2 border-amber-100 text-[0.9em] shrink-0">
-              <div className="font-bold text-amber-800 mb-1.5 uppercase tracking-wider text-[0.8em]">BUYER (CUSTOMER)</div>
-              <div className="grid grid-cols-2 gap-4">
+            <div className="py-1 border-b border-amber-100 text-[0.8em] shrink-0">
+              <div className="font-bold text-amber-800 mb-0.5 uppercase tracking-wider text-[0.8em]">BUYER (CUSTOMER)</div>
+              <div className="grid grid-cols-2 gap-1">
                 <div>
-                  <div className="flex items-baseline gap-2 mb-0.5"><span className="text-amber-900">Name:</span> <span className="font-bold text-[1.1em] text-amber-950">{activePrintBill.customerName}</span></div>
+                  <div className="flex items-baseline gap-1 mb-0.5"><span className="text-amber-900">Name:</span> <span className="font-bold text-[1.1em] text-amber-950">{activePrintBill.customerName}</span></div>
                   {billShowMobile && activePrintBill.customerPhone && activePrintBill.customerPhone !== 'N/A' && (
-                    <div className="flex items-baseline gap-2 mb-0.5"><span className="text-amber-900">Mobile:</span> <span className="font-semibold text-amber-950">{activePrintBill.customerPhone}</span></div>
+                    <div className="flex items-baseline gap-1 mb-0.5"><span className="text-amber-900">Mobile:</span> <span className="font-semibold text-amber-950">{activePrintBill.customerPhone}</span></div>
                   )}
                 </div>
                 <div>
@@ -4673,15 +4686,15 @@ export default function AdminDashboard() {
 
             {/* Items Grid */}
             <div className="flex-grow flex flex-col min-h-0">
-              <table className="w-full text-left text-[0.9em] mt-3 mb-1 border-collapse">
+              <table className="w-full text-left text-[0.9em] mt-1 mb-1 border-collapse">
                 <thead>
                   <tr className="bg-amber-950 text-white font-bold">
-                    <th className="p-1.5 rounded-l-md w-10 text-center">Sl</th>
+                    <th className="p-1.5 rounded-l-md w-6 text-center">Sl</th>
                     <th className="p-1.5">Description</th>
-                    <th className="p-1.5 text-center w-20">Size/Wt</th>
-                    <th className="p-1.5 text-right w-24">Price</th>
-                    <th className="p-1.5 text-center w-12">Qty</th>
-                    <th className="p-1.5 text-right rounded-r-md w-28">Amount</th>
+                    <th className="p-1.5 text-center w-14">Size/Wt</th>
+                    <th className="p-1.5 text-right w-16">Price</th>
+                    <th className="p-1.5 text-center w-8">Qty</th>
+                    <th className="p-1.5 text-right rounded-r-md w-20">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -4701,8 +4714,48 @@ export default function AdminDashboard() {
             </div>
 
             {/* Taxation calculation */}
-            <div className="grid grid-cols-2 gap-4 text-[0.9em] mt-2 pt-2 border-t-2 border-amber-950 shrink-0">
-              <div className="pr-4">
+            <div className="flex flex-col gap-2 text-[0.9em] mt-1 pt-1 border-t-2 border-amber-950 shrink-0">
+              <div className="text-right space-y-1 text-amber-900 ml-auto w-[80%]">
+                <div className="flex justify-between gap-1">
+                  <span>Subtotal:</span>
+                  <span className="font-bold text-amber-950">₹{Number(activePrintBill.subtotal).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                </div>
+                {Number(activePrintBill.discount) > 0 && (
+                  <div className="flex justify-between gap-1 text-emerald-700">
+                    <span>Discount:</span>
+                    <span className="font-bold">-₹{Number(activePrintBill.discount).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                  </div>
+                )}
+                {billShowGst && Number(activePrintBill.cgst) > 0 && (
+                  <div className="flex justify-between gap-1">
+                    <span>CGST @ {activePrintBill.cgstRate || '1.5'}%:</span>
+                    <span className="font-bold text-amber-950">₹{Number(activePrintBill.cgst).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                  </div>
+                )}
+                {billShowGst && Number(activePrintBill.sgst) > 0 && (
+                  <div className="flex justify-between gap-1">
+                    <span>SGST @ {activePrintBill.sgstRate || '1.5'}%:</span>
+                    <span className="font-bold text-amber-950">₹{Number(activePrintBill.sgst).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                  </div>
+                )}
+                <div className="flex justify-between gap-1 border-t border-dashed border-amber-300 pt-1 mt-1 text-[1.1em] font-black text-amber-950">
+                  <span className="uppercase">Grand Total:</span>
+                  <span className="text-[1.2em]">₹{Number(activePrintBill.total).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                </div>
+                
+                <div className="flex justify-between gap-1 pt-0.5 font-bold text-amber-800">
+                  <span>Amount Paid:</span>
+                  <span>₹{Number(activePrintBill.amountPaid).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                </div>
+                {Number(activePrintBill.amountDue) > 0 && (
+                  <div className="flex justify-between gap-1 pt-0.5 font-black text-rose-700">
+                    <span>Balance Due:</span>
+                    <span>₹{Number(activePrintBill.amountDue).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="w-full">
                 {billShowAmountWords && (
                   <>
                     <div className="font-bold text-amber-800">Amount Chargeable (in words):</div>
@@ -4712,50 +4765,11 @@ export default function AdminDashboard() {
                   </>
                 )}
               </div>
-              <div className="text-right space-y-1 text-amber-900">
-                <div className="flex justify-end gap-4">
-                  <span className="w-28">Subtotal:</span>
-                  <span className="font-bold text-amber-950 w-24">₹{Number(activePrintBill.subtotal).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
-                </div>
-                {Number(activePrintBill.discount) > 0 && (
-                  <div className="flex justify-end gap-4 text-emerald-700">
-                    <span className="w-28">Discount:</span>
-                    <span className="font-bold w-24">-₹{Number(activePrintBill.discount).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
-                  </div>
-                )}
-                {billShowGst && Number(activePrintBill.cgst) > 0 && (
-                  <div className="flex justify-end gap-4">
-                    <span className="w-28">CGST @ {activePrintBill.cgstRate || '1.5'}%:</span>
-                    <span className="font-bold text-amber-950 w-24">₹{Number(activePrintBill.cgst).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
-                  </div>
-                )}
-                {billShowGst && Number(activePrintBill.sgst) > 0 && (
-                  <div className="flex justify-end gap-4">
-                    <span className="w-28">SGST @ {activePrintBill.sgstRate || '1.5'}%:</span>
-                    <span className="font-bold text-amber-950 w-24">₹{Number(activePrintBill.sgst).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
-                  </div>
-                )}
-                <div className="flex justify-end gap-4 border-t border-dashed border-amber-300 pt-1.5 mt-1 text-[1.1em] font-black text-amber-950">
-                  <span className="w-28 uppercase">Grand Total:</span>
-                  <span className="text-[1.2em] w-24">₹{Number(activePrintBill.total).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
-                </div>
-                
-                <div className="flex justify-end gap-4 pt-0.5 font-bold text-amber-800">
-                  <span className="w-28">Amount Paid:</span>
-                  <span className="w-24">₹{Number(activePrintBill.amountPaid).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
-                </div>
-                {Number(activePrintBill.amountDue) > 0 && (
-                  <div className="flex justify-end gap-4 pt-0.5 font-black text-rose-700">
-                    <span className="w-28">Balance Due:</span>
-                    <span className="w-24">₹{Number(activePrintBill.amountDue).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
-                  </div>
-                )}
-              </div>
             </div>
 
             {/* Bank Details & remarks */}
-            <div className="grid grid-cols-2 gap-4 border-t-2 border-amber-200 pt-2 mt-2 text-[0.8em] leading-relaxed shrink-0">
-              <div className="space-y-2">
+            <div className="flex flex-col gap-1 border-t-2 border-amber-200 pt-1 mt-1 text-[0.8em] leading-relaxed shrink-0">
+              <div className="space-y-1">
                 {billTermsText && (
                   <div>
                     <div className="font-bold text-amber-900 mb-0.5">Terms & Conditions:</div>
@@ -4769,47 +4783,27 @@ export default function AdminDashboard() {
                   </div>
                 )}
               </div>
-              
-              {showBankDetails ? (
-                <div className="bg-white p-2 rounded-lg border border-amber-200 shadow-sm self-start">
-                  <div className="font-bold text-amber-900 mb-1 uppercase tracking-wide text-[0.85em]">Company Bank Details</div>
-                  <div className="text-amber-950 font-medium">
-                    <div className="grid grid-cols-[50px_1fr] gap-1 mb-0.5">
-                      <span className="text-amber-700/80">Bank:</span>
-                      <span>{bankName}</span>
-                    </div>
-                    <div className="grid grid-cols-[50px_1fr] gap-1 mb-0.5">
-                      <span className="text-amber-700/80">A/c No:</span>
-                      <span className="font-bold tracking-wider">{bankAccount}</span>
-                    </div>
-                    <div className="grid grid-cols-[50px_1fr] gap-1">
-                      <span className="text-amber-700/80">IFSC:</span>
-                      <span className="font-bold tracking-wider">{bankIfsc}</span>
-                    </div>
-                  </div>
-                </div>
-              ) : <div></div>}
             </div>
+              
+            {/* Footer Banner */}
+            {billFooterMsg && (
+              <div className="text-center mt-1 mb-2 py-1 bg-amber-950 text-amber-50 text-[0.8em] font-bold tracking-widest uppercase rounded shrink-0">
+                {billFooterMsg}
+              </div>
+            )}
 
             {/* Footer Signatures */}
             {billShowSignature && (
-              <div className="flex justify-between items-end pt-8 mt-2 text-[0.8em] font-semibold text-amber-900/80 shrink-0">
+              <div className="flex justify-between items-end pb-1 text-[0.8em] font-semibold text-amber-900/80 shrink-0">
                 <div>
                   <div className="border-b-2 border-amber-300 w-32 mb-1"></div>
                   <div className="text-center">Customer's Signature</div>
                 </div>
                 <div className="text-right">
                   <div className="text-[0.8em] text-amber-900/60 font-bold mb-6 uppercase">for {businessName}</div>
-                  <div className="border-b-2 border-amber-300 w-40 ml-auto mb-1"></div>
+                  <div className="border-b-2 border-amber-300 w-32 ml-auto mb-1"></div>
                   <div className="text-center">Authorised Signatory</div>
                 </div>
-              </div>
-            )}
-
-            {/* Footer Banner */}
-            {billFooterMsg && (
-              <div className="text-center mt-2 py-1.5 bg-amber-950 text-amber-50 text-[0.8em] font-bold tracking-widest uppercase rounded shrink-0">
-                {billFooterMsg}
               </div>
             )}
 
@@ -4881,7 +4875,7 @@ export default function AdminDashboard() {
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
-            width: 210mm !important;
+            width: 105mm !important;
             box-sizing: border-box !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
@@ -4922,7 +4916,7 @@ export default function AdminDashboard() {
           @page {
             size: ${
               printMode === "a4-bill" 
-                ? "A4 portrait"
+                ? "105mm 148mm"
                 : printMode === "bill"
                 ? "80mm auto"
                 : barcodeLayout === "a4"
