@@ -160,6 +160,7 @@ export default function AdminDashboard() {
   const [authLoading, setAuthLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"dashboard" | "products" | "stock" | "billing" | "ledger" | "settings">("dashboard");
   const [showProductForm, setShowProductForm] = useState(false);
+  const [viewingProduct, setViewingProduct] = useState<any>(null);
 
   // State collections
   const [products, setProducts] = useState<Product[]>([]);
@@ -2333,10 +2334,13 @@ export default function AdminDashboard() {
                                 )}
                               </td>
                               <td className="p-3">
-                                <div className="flex items-center space-x-3">
-                                  <img src={prod.imageUrls?.[0] || prod.imageUrl} alt={prod.name} className="w-10 h-10 object-cover rounded-lg border border-amber-100" />
+                                <div 
+                                  className="flex items-center space-x-3 cursor-pointer group"
+                                  onClick={() => setViewingProduct(prod)}
+                                >
+                                  <img src={prod.imageUrls?.[0] || prod.imageUrl} alt={prod.name} className="w-10 h-10 object-cover rounded-lg border border-amber-100 group-hover:opacity-80 transition-opacity" />
                                   <div>
-                                    <span className="font-bold text-amber-950 block">{prod.name}</span>
+                                    <span className="font-bold text-amber-950 block group-hover:text-amber-700 transition-colors">{prod.name}</span>
                                     <span className="text-[10px] text-amber-900/60 truncate max-w-[200px] block">{prod.description || "No description"}</span>
                                   </div>
                                 </div>
@@ -2489,10 +2493,13 @@ export default function AdminDashboard() {
                           {filteredProducts.map(prod => (
                             <tr key={prod.id} className="hover:bg-amber-50/20">
                               <td className="p-3">
-                                <div className="flex items-center space-x-3">
-                                  <img src={prod.imageUrls?.[0] || prod.imageUrl} alt={prod.name} className="w-10 h-10 object-cover rounded-lg border border-amber-100" />
+                                <div 
+                                  className="flex items-center space-x-3 cursor-pointer group"
+                                  onClick={() => setViewingProduct(prod)}
+                                >
+                                  <img src={prod.imageUrls?.[0] || prod.imageUrl} alt={prod.name} className="w-10 h-10 object-cover rounded-lg border border-amber-100 group-hover:opacity-80 transition-opacity" />
                                   <div>
-                                    <span className="font-bold text-amber-950 block">{prod.name}</span>
+                                    <span className="font-bold text-amber-950 block group-hover:text-amber-700 transition-colors">{prod.name}</span>
                                     {prod.size && <span className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded mt-1 inline-block">Size: {prod.size}</span>}
                                   </div>
                                 </div>
@@ -4051,6 +4058,76 @@ export default function AdminDashboard() {
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Product Full View Modal */}
+      {viewingProduct && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" 
+          onClick={() => setViewingProduct(null)}
+        >
+          <div 
+            className="bg-white rounded-3xl overflow-hidden w-full max-w-2xl shadow-2xl flex flex-col md:flex-row relative" 
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setViewingProduct(null)}
+              className="absolute top-4 right-4 z-10 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full font-bold text-xs cursor-pointer transition-colors"
+            >
+              ✕
+            </button>
+            
+            <div className="w-full md:w-1/2 bg-amber-50 flex items-center justify-center">
+              <img 
+                src={viewingProduct.imageUrls?.[0] || viewingProduct.imageUrl || "https://placehold.co/400x400?text=No+Image"} 
+                alt={viewingProduct.name} 
+                className="w-full h-64 md:h-full object-cover"
+              />
+            </div>
+            
+            <div className="w-full md:w-1/2 p-6 md:p-8 flex flex-col space-y-4 max-h-[80vh] overflow-y-auto">
+              <div>
+                <h3 className="font-serif font-black text-2xl text-amber-950 leading-tight">{viewingProduct.name}</h3>
+                <p className="text-sm font-bold text-amber-900/70 mt-1">{viewingProduct.category} {viewingProduct.size ? `• Size: ${viewingProduct.size}` : ""}</p>
+              </div>
+              
+              <div className="flex items-end gap-3">
+                <span className="text-3xl font-black text-emerald-800">
+                  ₹{Number(viewingProduct.discountPrice || viewingProduct.price).toLocaleString("en-IN")}
+                </span>
+                {viewingProduct.discountPrice && (
+                  <span className="text-sm font-bold text-amber-900/50 line-through pb-1">
+                    ₹{Number(viewingProduct.price).toLocaleString("en-IN")}
+                  </span>
+                )}
+              </div>
+
+              <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100/60 flex flex-col space-y-2">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-amber-900/70">Stock Available:</span>
+                  <span className={`font-bold ${viewingProduct.stock > 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                    {viewingProduct.stock} units
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-amber-900/70">Barcode:</span>
+                  <span className="font-mono font-bold text-amber-950">{viewingProduct.barcode || "N/A"}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-amber-900/70">Taxes:</span>
+                  <span className="font-bold text-amber-950">CGST {viewingProduct.cgst}%, SGST {viewingProduct.sgst}%</span>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-amber-100 flex-grow">
+                <h4 className="text-xs font-bold text-amber-900/50 uppercase tracking-wider mb-2">Description</h4>
+                <p className="text-sm text-amber-950 whitespace-pre-line leading-relaxed">
+                  {viewingProduct.description || "No detailed description available for this product."}
+                </p>
+              </div>
             </div>
           </div>
         </div>
