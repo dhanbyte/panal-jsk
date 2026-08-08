@@ -28,6 +28,7 @@ export default function PublicStore() {
   const [whatsappNumber, setWhatsappNumber] = useState("918949075688"); // updated to user provided default
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   // Fetch products and settings
   useEffect(() => {
@@ -270,7 +271,7 @@ export default function PublicStore() {
             </button>
 
             {/* Modal Image & Video Carousel */}
-            <div className="w-full md:w-1/2 bg-amber-50 flex flex-col relative h-[75vh] md:h-auto">
+            <div className="w-full md:w-1/2 bg-amber-50 flex flex-col relative aspect-square md:aspect-auto md:min-h-[550px] shrink-0">
               <div className="flex-1 overflow-hidden relative">
                 {activeImageIndex === 999 && selectedProduct.videoUrl ? (
                   <video
@@ -285,7 +286,9 @@ export default function PublicStore() {
                     <img
                       src={selectedProduct.imageUrls?.[activeImageIndex] || selectedProduct.imageUrl}
                       alt={selectedProduct.name}
-                      className="w-full h-full object-cover absolute inset-0 transition-opacity duration-300"
+                      onClick={() => setLightboxImage(selectedProduct.imageUrls?.[activeImageIndex] || selectedProduct.imageUrl || null)}
+                      className="w-full h-full object-contain absolute inset-0 transition-opacity duration-300 p-2 cursor-zoom-in"
+                      title="Click to view full screen"
                     />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-amber-800/40">
@@ -405,6 +408,25 @@ export default function PublicStore() {
           <p>© {new Date().getFullYear()} Jsk art jewellery. All Rights Reserved.</p>
         </div>
       </footer>
+      {/* Lightbox Modal for Full Screen Image */}
+      {lightboxImage && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setLightboxImage(null)}
+        >
+          <button
+            onClick={() => setLightboxImage(null)}
+            className="absolute top-6 right-6 bg-white/20 hover:bg-white/40 text-white p-3 rounded-full font-bold text-lg cursor-pointer transition-colors"
+          >
+            ✕
+          </button>
+          <img 
+            src={lightboxImage} 
+            alt="Full size view" 
+            className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl"
+          />
+        </div>
+      )}
     </div>
   );
 }
