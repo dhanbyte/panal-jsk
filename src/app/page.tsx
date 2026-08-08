@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { collection, getDocs, query, where, limit } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Search, Phone, Gift, Tag, Sparkles, Filter, Info, Eye } from "lucide-react";
+import { Search, Phone, Gift, Tag, Sparkles, Filter, Info, Eye, MessageCircle } from "lucide-react";
 
 interface Product {
   id: string;
@@ -25,7 +25,7 @@ export default function PublicStore() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [whatsappNumber, setWhatsappNumber] = useState("919999999999"); // default number
+  const [whatsappNumber, setWhatsappNumber] = useState("918949075688"); // updated to user provided default
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
@@ -48,7 +48,7 @@ export default function PublicStore() {
             stock: Number(data.stock) || 0,
             category: data.category || "Other",
             imageUrl: data.imageUrl || "",
-            imageUrls: data.imageUrls || (data.imageUrl ? [data.imageUrl] : ["https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=600&auto=format&fit=crop&q=60"]),
+            imageUrls: data.imageUrls || (data.imageUrl ? [data.imageUrl] : []),
             size: data.size || "",
             videoUrl: data.videoUrl || "",
           });
@@ -90,80 +90,76 @@ export default function PublicStore() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#FAF8F5] to-[#F3EFE9] text-[#2C2620] font-sans">
+    <div className="min-h-screen bg-gradient-to-b from-[#FAF8F5] to-[#F3EFE9] text-[#2C2620] font-sans selection:bg-amber-200">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-[#FAF8F5]/90 backdrop-blur-md border-b border-[#E6DEC9] px-4 py-4 md:px-8 flex items-center justify-between shadow-sm">
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-500 to-amber-700 flex items-center justify-center shadow-md">
             <span className="text-white font-serif font-bold text-xl">J</span>
           </div>
           <div>
-            <h1 className="text-xl md:text-2xl font-serif font-bold tracking-wide text-amber-900 leading-none">
+            <h1 className="text-lg md:text-xl font-serif font-bold tracking-wider text-amber-900 uppercase leading-none">
               JSK Art Jewellery
             </h1>
-            <span className="text-[10px] tracking-widest uppercase text-amber-700 font-semibold">
-              Premium Collection
-            </span>
           </div>
         </div>
 
         <a
-          href="/login"
-          className="text-xs md:text-sm font-semibold text-amber-800 hover:text-amber-950 border border-amber-800/20 hover:border-amber-950/40 rounded-full px-4 py-1.5 transition-all duration-300"
+          href="#contact"
+          className="text-xs md:text-sm font-semibold text-amber-800 hover:text-amber-950 uppercase tracking-wider transition-colors duration-300"
         >
-          Admin Login
+          Contact
         </a>
       </header>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden py-12 md:py-20 px-4 text-center">
-        <div className="max-w-3xl mx-auto space-y-6 relative z-10">
-          <div className="inline-flex items-center space-x-2 bg-amber-100/60 border border-amber-200 rounded-full px-4 py-1.5 text-xs text-amber-800 font-semibold animate-pulse">
+      <section 
+        className="relative overflow-hidden py-16 md:py-24 px-4 text-center bg-cover bg-center"
+        style={{ backgroundImage: "linear-gradient(to bottom, rgba(250, 248, 245, 0.2), rgba(250, 248, 245, 1)), url('/hero-bg.jpg')" }}
+      >
+        <div className="max-w-3xl mx-auto space-y-6 relative z-10 backdrop-blur-[2px] bg-white/30 p-8 rounded-3xl border border-white/40 shadow-xl">
+          <div className="inline-flex items-center space-x-2 bg-amber-100/80 backdrop-blur-md border border-amber-200 rounded-full px-4 py-1.5 text-xs text-amber-900 font-bold animate-pulse">
             <Sparkles size={14} className="text-amber-600" />
-            <span>Exquisite Handcrafted Art Jewellery</span>
+            <span>Premium Handcrafted Jewellery</span>
           </div>
-          <h2 className="text-4xl md:text-6xl font-serif font-black tracking-tight text-amber-950 leading-tight">
-            Elevate Your Elegance with <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-600 to-amber-800">JSK</span>
+          <h2 className="text-3xl md:text-5xl font-serif font-black tracking-tight text-amber-950 leading-tight drop-shadow-sm">
+            Elevate Your Elegance with <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-700 to-amber-900">JSK</span>
           </h2>
-          <p className="text-sm md:text-lg text-amber-900/80 max-w-2xl mx-auto leading-relaxed">
-            Browse our unique collection of rings, necklaces, earrings, and bangles. Message us on WhatsApp to order or customize.
+          <p className="text-sm md:text-base text-amber-950/90 font-medium max-w-xl mx-auto leading-relaxed drop-shadow-sm">
+            Discover our curated collection of fine art jewellery. Explore unique designs and connect with us on WhatsApp for inquiries.
           </p>
 
           {/* Search bar */}
-          <div className="max-w-md mx-auto relative mt-8">
+          <div className="max-w-md mx-auto relative mt-6">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Search size={18} className="text-amber-700/60" />
+              <Search size={16} className="text-amber-800/80" />
             </div>
             <input
               type="text"
-              placeholder="Search design name or keyword..."
+              placeholder="Search collection..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 md:py-3.5 rounded-full border border-amber-200 bg-white/80 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-md text-sm md:text-base placeholder-amber-700/40 transition-all duration-300"
+              className="w-full pl-11 pr-4 py-3.5 border border-amber-200 bg-white/90 focus:bg-white focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/50 text-sm md:text-base transition-all duration-300 rounded-full shadow-lg placeholder-amber-800/60 font-medium"
             />
           </div>
         </div>
-
-        {/* Decorative background gradients */}
-        <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-amber-200/30 blur-3xl" />
-        <div className="absolute -bottom-40 -right-40 w-96 h-96 rounded-full bg-amber-300/20 blur-3xl" />
       </section>
 
       {/* Main Catalog Section */}
-      <main className="max-w-7xl mx-auto px-4 md:px-8 pb-20">
+      <main className="max-w-7xl mx-auto px-4 md:px-8 py-10 pb-20 relative z-10">
         {/* Categories Bar */}
-        <div className="flex space-x-2 overflow-x-auto pb-4 mb-8 scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
+        <div className="flex space-x-3 overflow-x-auto pb-4 mb-8 scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
           {categories.map((category) => (
             <button
               key={category}
               onClick={() => setSelectedCategory(category)}
-              className={`flex items-center space-x-1 px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 border whitespace-nowrap cursor-pointer ${
+              className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 whitespace-nowrap cursor-pointer border ${
                 selectedCategory === category
                   ? "bg-amber-800 text-white border-amber-900 shadow-lg shadow-amber-800/20 scale-105"
                   : "bg-white/60 text-amber-900 border-amber-200/60 hover:bg-amber-100/50"
               }`}
             >
-              <span>{category}</span>
+              {category}
             </button>
           ))}
         </div>
@@ -171,95 +167,69 @@ export default function PublicStore() {
         {/* Product Grid */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-amber-800"></div>
-            <p className="mt-4 text-amber-800/80 font-medium">Loading collection...</p>
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-amber-800"></div>
           </div>
         ) : filteredProducts.length === 0 ? (
-          <div className="bg-white/60 border border-amber-200/40 rounded-2xl p-12 text-center max-w-lg mx-auto shadow-sm">
-            <Info size={40} className="mx-auto text-amber-700/50 mb-3" />
+          <div className="bg-white/60 border border-amber-200/40 rounded-2xl p-10 text-center max-w-lg mx-auto shadow-sm">
             <p className="text-amber-900 font-bold text-lg">No products found</p>
-            <p className="text-amber-800/70 text-sm mt-1">Try changing your search terms or category selection.</p>
+            <p className="text-amber-800/70 text-sm mt-2">Try adjusting your search or category filter.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-5">
             {filteredProducts.map((product) => (
               <div
                 key={product.id}
-                className="bg-white rounded-2xl overflow-hidden border border-amber-100 hover:border-amber-300 shadow-md hover:shadow-xl transition-all duration-300 flex flex-col group"
+                className="group flex flex-col cursor-pointer bg-white rounded-xl overflow-hidden border border-amber-100 hover:border-amber-300 shadow-sm hover:shadow-md transition-all duration-300"
+                onClick={() => {
+                  setSelectedProduct(product);
+                  setActiveImageIndex(0);
+                }}
               >
                 {/* Product Image */}
-                <div className="relative aspect-square overflow-hidden bg-amber-50/50">
-                  <img
-                    src={product.imageUrls?.[0] || product.imageUrl}
-                    alt={product.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    loading="lazy"
-                  />
-                  {product.stock <= 0 && (
-                    <div className="absolute inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center">
-                      <span className="bg-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider">
-                        Out Of Stock
-                      </span>
+                <div className="relative aspect-[4/5] overflow-hidden bg-amber-50 border-b border-amber-50">
+                  {product.imageUrls?.[0] || product.imageUrl ? (
+                    <img
+                      src={product.imageUrls?.[0] || product.imageUrl}
+                      alt={product.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-amber-800/30 space-y-2">
+                      <Gift size={32} />
+                      <span className="text-[10px] uppercase tracking-widest font-semibold">No Image</span>
                     </div>
                   )}
-                  {product.stock > 0 && product.stock <= 5 && (
-                    <span className="absolute top-3 left-3 bg-amber-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide">
-                      Only {product.stock} Left
-                    </span>
+                  {product.stock <= 0 && (
+                    <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md text-white px-2 py-1 text-[10px] uppercase tracking-wider font-bold rounded-full">
+                      Sold Out
+                    </div>
                   )}
-                  <button
-                    onClick={() => {
-                      setSelectedProduct(product);
-                      setActiveImageIndex(0);
-                    }}
-                    className="absolute bottom-3 right-3 p-2 bg-white/90 hover:bg-white text-amber-900 rounded-full shadow-md hover:scale-110 transition-all duration-300 cursor-pointer"
-                  >
-                    <Eye size={16} />
-                  </button>
+                  {product.discountPrice && product.stock > 0 && (
+                    <div className="absolute top-2 right-2 bg-amber-600 text-white px-2 py-1 text-[10px] uppercase tracking-wider font-bold rounded-full shadow-sm">
+                      Sale
+                    </div>
+                  )}
                 </div>
 
                 {/* Info */}
-                <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                  <div className="space-y-1">
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
-                      {product.category}
-                    </span>
-                    <h3 className="font-serif font-bold text-lg text-amber-950 line-clamp-1">
-                      {product.name}
-                    </h3>
-                    <p className="text-xs text-amber-900/70 line-clamp-2 min-h-[2rem]">
-                      {product.description}
-                    </p>
-                  </div>
-
-                  <div className="space-y-3 pt-2">
-                    <div className="flex items-baseline justify-between border-t border-amber-50 pt-3">
-                      <span className="text-xs text-amber-700/60 font-semibold">Inquiry Price</span>
-                      <div className="flex flex-col items-end">
-                        {product.discountPrice ? (
-                          <>
-                            <span className="text-[10px] text-amber-900/50 line-through">₹{product.price.toLocaleString("en-IN")}</span>
-                            <span className="text-xl font-bold text-amber-900">₹{product.discountPrice.toLocaleString("en-IN")}</span>
-                          </>
-                        ) : (
-                          <span className="text-xl font-bold text-amber-900">₹{product.price.toLocaleString("en-IN")}</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <a
-                      href={getWhatsAppLink(product)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 transition-all duration-300 ${
-                        product.stock <= 0
-                          ? "bg-amber-100 text-amber-800/40 cursor-not-allowed pointer-events-none"
-                          : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg shadow-emerald-600/10 cursor-pointer"
-                      }`}
-                    >
-                      <Phone size={14} className="fill-current" />
-                      <span>Inquire on WhatsApp</span>
-                    </a>
+                <div className="flex flex-col space-y-1 p-3">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-amber-600">
+                    {product.category}
+                  </span>
+                  <h3 className="font-serif font-bold text-sm text-amber-950 line-clamp-1 group-hover:text-amber-700 transition-colors">
+                    {product.name}
+                  </h3>
+                  
+                  <div className="flex items-baseline space-x-2 pt-1">
+                    {product.discountPrice ? (
+                      <>
+                        <span className="text-sm font-bold text-amber-900">₹{product.discountPrice.toLocaleString("en-IN")}</span>
+                        <span className="text-[10px] text-amber-900/50 line-through">₹{product.price.toLocaleString("en-IN")}</span>
+                      </>
+                    ) : (
+                      <span className="text-sm font-bold text-amber-900">₹{product.price.toLocaleString("en-IN")}</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -268,20 +238,34 @@ export default function PublicStore() {
         )}
       </main>
 
+      {/* Floating WhatsApp Button */}
+      <a
+        href={`https://wa.me/${whatsappNumber}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-6 right-6 z-50 bg-[#25D366] hover:bg-[#20b858] text-white p-4 rounded-full shadow-xl hover:scale-110 transition-transform duration-300 flex items-center justify-center group"
+        title="Chat on WhatsApp"
+      >
+        <MessageCircle size={28} className="fill-current text-white" />
+        <span className="absolute right-full mr-4 bg-white text-gray-900 text-xs font-semibold px-3 py-2 rounded-lg shadow-md opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300 whitespace-nowrap border border-gray-100">
+          Chat with us on WhatsApp
+        </span>
+      </a>
+
       {/* Product Detail Modal */}
       {selectedProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl overflow-hidden max-w-2xl w-full shadow-2xl border border-amber-100 flex flex-col md:flex-row relative">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 md:p-4 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+          <div className="bg-white w-full md:max-w-4xl min-h-screen md:min-h-[auto] md:rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row relative border border-amber-100">
             <button
               onClick={() => setSelectedProduct(null)}
-              className="absolute top-4 right-4 z-10 bg-white/80 hover:bg-white text-amber-950 p-2 rounded-full shadow-md font-bold text-sm cursor-pointer"
+              className="absolute top-4 right-4 z-10 bg-white/90 text-amber-950 p-2 rounded-full shadow-md hover:bg-white transition-colors cursor-pointer"
             >
               ✕
             </button>
 
             {/* Modal Image & Video Carousel */}
-            <div className="w-full md:w-1/2 aspect-square md:aspect-auto md:h-full bg-amber-50 flex flex-col relative">
-              <div className="flex-1 overflow-hidden relative min-h-[300px] md:min-h-full">
+            <div className="w-full md:w-1/2 bg-amber-50 flex flex-col relative aspect-square md:aspect-auto">
+              <div className="flex-1 overflow-hidden relative">
                 {activeImageIndex === 999 && selectedProduct.videoUrl ? (
                   <video
                     src={selectedProduct.videoUrl}
@@ -291,22 +275,29 @@ export default function PublicStore() {
                     className="w-full h-full object-contain bg-black"
                   />
                 ) : (
-                  <img
-                    src={selectedProduct.imageUrls?.[activeImageIndex] || selectedProduct.imageUrl}
-                    alt={selectedProduct.name}
-                    className="w-full h-full object-cover absolute inset-0 transition-opacity duration-300"
-                  />
+                  (selectedProduct.imageUrls?.[activeImageIndex] || selectedProduct.imageUrl) ? (
+                    <img
+                      src={selectedProduct.imageUrls?.[activeImageIndex] || selectedProduct.imageUrl}
+                      alt={selectedProduct.name}
+                      className="w-full h-full object-cover absolute inset-0 transition-opacity duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-amber-800/40">
+                      <Gift size={48} className="mb-4 opacity-50" />
+                      <p className="text-xs uppercase tracking-widest font-semibold">No Image Available</p>
+                    </div>
+                  )
                 )}
               </div>
               {((selectedProduct.imageUrls && selectedProduct.imageUrls.length > 1) || selectedProduct.videoUrl) && (
                 <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-2 px-4">
-                  <div className="flex space-x-2 bg-black/45 backdrop-blur-md p-2 rounded-2xl overflow-x-auto max-w-full">
+                  <div className="flex space-x-2 bg-black/40 backdrop-blur-md p-1.5 rounded-xl overflow-x-auto max-w-full shadow-sm">
                     {selectedProduct.imageUrls?.map((url, idx) => (
                       <button
                         key={idx}
                         onClick={() => setActiveImageIndex(idx)}
-                        className={`w-10 h-10 rounded-lg overflow-hidden shrink-0 border-2 transition-all cursor-pointer ${
-                          activeImageIndex === idx ? "border-amber-400 scale-110" : "border-transparent opacity-70 hover:opacity-100"
+                        className={`w-10 h-10 rounded-lg overflow-hidden shrink-0 transition-all cursor-pointer ${
+                          activeImageIndex === idx ? "opacity-100 ring-2 ring-amber-400 ring-offset-1 ring-offset-transparent" : "opacity-60 hover:opacity-100"
                         }`}
                       >
                         <img src={url} className="w-full h-full object-cover" />
@@ -315,12 +306,11 @@ export default function PublicStore() {
                     {selectedProduct.videoUrl && (
                       <button
                         onClick={() => setActiveImageIndex(999)}
-                        className={`w-10 h-10 rounded-lg bg-amber-950 flex items-center justify-center shrink-0 border-2 transition-all cursor-pointer text-white font-bold text-[10px] ${
-                          activeImageIndex === 999 ? "border-amber-400 scale-110" : "border-transparent opacity-70 hover:opacity-100"
+                        className={`w-10 h-10 rounded-lg bg-amber-950 flex items-center justify-center shrink-0 transition-all cursor-pointer text-white font-medium text-[10px] uppercase ${
+                          activeImageIndex === 999 ? "opacity-100 ring-2 ring-amber-400 ring-offset-1 ring-offset-transparent" : "opacity-80 hover:opacity-100"
                         }`}
-                        title="Watch Video"
                       >
-                        ▶ Video
+                        Video
                       </button>
                     )}
                   </div>
@@ -329,59 +319,57 @@ export default function PublicStore() {
             </div>
 
             {/* Modal Details */}
-            <div className="p-6 md:p-8 w-full md:w-1/2 flex flex-col justify-between space-y-6">
-              <div className="space-y-4">
+            <div className="p-6 md:p-8 w-full md:w-1/2 flex flex-col overflow-y-auto">
+              <div className="space-y-6">
                 <div>
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-amber-700 bg-amber-50 px-2.5 py-1 rounded">
+                  <span className="text-[10px] uppercase tracking-widest font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-md mb-3 inline-block">
                     {selectedProduct.category}
                   </span>
-                  <h3 className="font-serif font-extrabold text-2xl text-amber-950 mt-2">
+                  <h3 className="font-serif font-black text-2xl md:text-3xl text-amber-950 leading-tight">
                     {selectedProduct.name}
                   </h3>
-                </div>
-                <p className="text-sm text-amber-900/80 leading-relaxed">
-                  {selectedProduct.description}
-                </p>
-                <div className="flex flex-col border-t border-b border-amber-50 py-4 space-y-1">
-                  <span className="text-sm text-amber-700/60 font-semibold">Special Price</span>
-                  <div className="flex items-baseline space-x-3">
+                  
+                  <div className="flex items-baseline space-x-3 mt-4 border-b border-amber-50 pb-4">
                     {selectedProduct.discountPrice ? (
                       <>
-                        <span className="text-3xl font-black text-emerald-700">₹{selectedProduct.discountPrice.toLocaleString("en-IN")}</span>
+                        <span className="text-3xl font-black text-amber-900">₹{selectedProduct.discountPrice.toLocaleString("en-IN")}</span>
                         <span className="text-lg font-bold text-amber-900/40 line-through">₹{selectedProduct.price.toLocaleString("en-IN")}</span>
-                        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full ml-auto">
-                          SAVE ₹{(selectedProduct.price - selectedProduct.discountPrice).toLocaleString("en-IN")}
+                        <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded-full ml-auto">
+                          Sale
                         </span>
                       </>
                     ) : (
-                      <span className="text-3xl font-black text-amber-950">₹{selectedProduct.price.toLocaleString("en-IN")}</span>
+                      <span className="text-3xl font-black text-amber-900">₹{selectedProduct.price.toLocaleString("en-IN")}</span>
                     )}
                   </div>
                 </div>
+
+                <div>
+                  <p className="text-sm text-amber-900/80 leading-relaxed whitespace-pre-wrap">
+                    {selectedProduct.description || "No description available for this beautiful jewellery."}
+                  </p>
+                </div>
+
                 {selectedProduct.size && (
-                  <div className="text-xs text-amber-900/80 font-bold bg-amber-100/50 border border-amber-200/40 rounded-xl px-3 py-2 flex justify-between items-center">
-                    <span>Available Size:</span>
-                    <span className="bg-white border border-amber-200/65 px-2 py-0.5 rounded shadow-sm">{selectedProduct.size}</span>
+                  <div className="pt-2">
+                    <div className="text-xs text-amber-900/80 font-bold bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 flex justify-between items-center">
+                      <span>Available Size:</span>
+                      <span className="bg-white border border-amber-200 px-3 py-1 rounded shadow-sm">{selectedProduct.size}</span>
+                    </div>
                   </div>
                 )}
-              </div>
-
-              <div className="space-y-2">
-                <a
-                  href={getWhatsAppLink(selectedProduct)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
-                >
-                  <Phone size={16} className="fill-current" />
-                  <span>Send WhatsApp Inquiry</span>
-                </a>
-                <button
-                  onClick={() => setSelectedProduct(null)}
-                  className="w-full py-2.5 bg-amber-50 hover:bg-amber-100/60 text-amber-900 rounded-xl font-bold text-xs text-center transition-all duration-300 cursor-pointer"
-                >
-                  Back to collection
-                </button>
+                
+                <div className="pt-4">
+                  <a
+                    href={getWhatsAppLink(selectedProduct)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm uppercase tracking-widest flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transition-all cursor-pointer"
+                  >
+                    <Phone size={16} className="fill-current" />
+                    <span>Inquire via WhatsApp</span>
+                  </a>
+                </div>
               </div>
             </div>
           </div>
@@ -389,23 +377,26 @@ export default function PublicStore() {
       )}
 
       {/* Footer */}
-      <footer className="bg-amber-950 text-amber-100 py-12 px-4 md:px-8 border-t border-amber-900">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center space-y-6 md:space-y-0">
-          <div className="text-center md:text-left space-y-2">
-            <h4 className="font-serif font-bold text-lg tracking-wide text-white">JSK Art Jewellery</h4>
-            <p className="text-xs text-amber-200/60">© 2026 JSK Art Jewellery. All Rights Reserved.</p>
+      <footer id="contact" className="bg-amber-950 text-amber-100 py-16 px-4 md:px-8 border-t border-amber-900 relative z-10">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start space-y-10 md:space-y-0">
+          <div className="space-y-4 max-w-sm">
+            <h4 className="font-serif font-bold text-xl uppercase tracking-wider text-white">Jsk art jewellery</h4>
+            <div className="text-sm text-amber-200/80 leading-relaxed space-y-1">
+              <p>Tripoliya bazar 1st gali kamla bazar jodhpur (Raj.)</p>
+              <p>Pin code:- 342001</p>
+              <p className="pt-2 text-white font-semibold">Mo.no:- 8949075688</p>
+            </div>
           </div>
-          <div className="flex items-center space-x-4">
-            <a
-              href={`https://wa.me/${whatsappNumber}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center space-x-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 px-4 py-2 rounded-full text-xs font-semibold border border-emerald-500/20 transition-all duration-300"
-            >
-              <Phone size={14} className="fill-current" />
-              <span>Contact Us</span>
-            </a>
+          <div className="space-y-4">
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Quick Links</h4>
+            <div className="flex flex-col space-y-3">
+              <button onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})} className="text-sm text-amber-200/80 hover:text-white text-left transition-colors">Shop Collection</button>
+              <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer" className="text-sm text-amber-200/80 hover:text-white text-left transition-colors">WhatsApp Support</a>
+            </div>
           </div>
+        </div>
+        <div className="max-w-7xl mx-auto mt-16 pt-8 border-t border-amber-900/50 flex flex-col md:flex-row justify-between items-center text-xs text-amber-600">
+          <p>© {new Date().getFullYear()} Jsk art jewellery. All Rights Reserved.</p>
         </div>
       </footer>
     </div>

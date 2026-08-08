@@ -529,7 +529,7 @@ export default function AdminDashboard() {
         description: productForm.description,
         size: productForm.size,
         videoUrl: uploadedVideoUrl,
-        imageUrls: uploadedUrls.length > 0 ? uploadedUrls : ["https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=600&auto=format&fit=crop&q=60"],
+        imageUrls: uploadedUrls.length > 0 ? uploadedUrls : [],
         lowStockThreshold: Number(productForm.lowStockThreshold) || 5,
         barcode: finalBarcode,
         updatedAt: serverTimestamp()
@@ -758,28 +758,38 @@ export default function AdminDashboard() {
     }
   };
 
-  // Add sample products if empty to make UI gorgeous
-  const handleAddSamples = async () => {
+  const getNextBarcode = () => {
+    let maxNum = 0;
+    products.forEach(p => {
+      if (p.barcode && p.barcode.toUpperCase().startsWith("JSK-")) {
+        const numStr = p.barcode.substring(4);
+        const numPart = parseInt(numStr, 10);
+        if (!isNaN(numPart) && numPart > maxNum) {
+          maxNum = numPart;
+        }
+      }
+    });
+    return `JSK-${String(maxNum + 1).padStart(3, '0')}`;
+  };
+
+  const handleWipeDatabase = async () => {
+    if(!confirm("Are you sure you want to permanently delete EVERYTHING (Products, Bills, and Purchases)? This cannot be undone!")) return;
     setLoadingData(true);
     try {
-      const sampleItems = [
-        { name: "Royal Gold Kundan Necklace Set", price: 125000, stock: 3, category: "Necklaces", description: "Elegant handcrafted kundan set with ruby and emerald stone drops. Complete bridal heritage collection.", imageUrls: ["https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=600&auto=format&fit=crop&q=60"], lowStockThreshold: 2 },
-        { name: "Vintage Diamond Gold Ring", price: 45000, stock: 12, category: "Rings", description: "18k gold engagement ring studded with certified solitaire diamonds and intricate side filigree.", imageUrls: ["https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=600&auto=format&fit=crop&q=60"], lowStockThreshold: 4 },
-        { name: "Traditional Kundan Jhumka", price: 18500, stock: 2, category: "Earrings", description: "Traditional gold plated pearls and kundan work heavy jhumkas for weddings and festivals.", imageUrls: ["https://images.unsplash.com/photo-1635767798638-3e25273a8236?w=600&auto=format&fit=crop&q=60"], lowStockThreshold: 3 },
-        { name: "Gold Filigree Bridal Bangle Set", price: 89000, stock: 6, category: "Bangles", description: "Pair of 22k premium gold bangles showcasing hand engraved traditional Indian filigree art.", imageUrls: ["https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=600&auto=format&fit=crop&q=60"], lowStockThreshold: 2 },
-      ];
+      const pSnap = await getDocs(collection(db, "products"));
+      await Promise.all(pSnap.docs.map(d => deleteDoc(doc(db, "products", d.id))));
+      
+      const bSnap = await getDocs(collection(db, "bills"));
+      await Promise.all(bSnap.docs.map(d => deleteDoc(doc(db, "bills", d.id))));
 
-      for (const item of sampleItems) {
-        await addDoc(collection(db, "products"), {
-          ...item,
-          createdAt: serverTimestamp()
-        });
-      }
+      const puSnap = await getDocs(collection(db, "purchases"));
+      await Promise.all(puSnap.docs.map(d => deleteDoc(doc(db, "purchases", d.id))));
+
       fetchData();
-      alert("Sample products added successfully!");
-    } catch (err) {
-      console.error(err);
-      alert("Error adding sample products.");
+      alert("Database wiped successfully! Everything is now 0.");
+    } catch(e) {
+      console.error(e);
+      alert("Failed to wipe DB.");
     } finally {
       setLoadingData(false);
     }
@@ -1805,10 +1815,10 @@ export default function AdminDashboard() {
                 <div className="flex justify-between items-center">
                   <h2 className="font-serif font-black text-2xl md:text-3xl text-amber-950">Overview Dashboard</h2>
                   <button 
-                    onClick={handleAddSamples}
-                    className="text-xs bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-200 px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer"
+                    onClick={handleWipeDatabase}
+                    className="text-xs bg-red-100 hover:bg-red-200 text-red-900 border border-red-200 px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer"
                   >
-                    + Load Demo Products
+                    ⚠ Wipe All Products
                   </button>
                 </div>
 
@@ -1939,7 +1949,7 @@ export default function AdminDashboard() {
                           id: "", name: "", price: "", discountPrice: "", purchasePrice: "",
                           cgst: defaultGst.cgst.toString(), sgst: defaultGst.sgst.toString(), igst: defaultGst.igst.toString(),
                           stock: "", category: customCategories[0] || "Rings", description: "",
-                          lowStockThreshold: "5", size: "", videoUrl: "", barcode: "", existingImageUrls: []
+                          lowStockThreshold: "5", size: "", videoUrl: "", barcode: getNextBarcode(), existingImageUrls: []
                         });
                         setImageFiles([]);
                         setShowProductForm(true);
