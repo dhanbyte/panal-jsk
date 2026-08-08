@@ -81,6 +81,8 @@ This document outlines the complete UI/UX design and feature requirements for th
     *   Implement PDF generation and GST calculations.
     *   Store customer details and purchase history in Firestore.
 *   **Phase 4: Payment Tracking & Final Polish**
-    *   Add payment ledger.
+    *   Add maunal dalaega only price add karege samjhe 
+        mobile responsive karna h oru only admin login hoga our users kali koei website pe aaya to vo prodcuts dekh ksata h our usako whatsup me send kar dege producs ke daitls ke saath 
+        
     *   Add stock warning indicators.
     *   Final UI/UX polishing and testing.

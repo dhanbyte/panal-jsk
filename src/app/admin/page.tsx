@@ -18,6 +18,8 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { auth, db, storage } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import jsPDF from "jspdf";
+// @ts-ignore
+import JsBarcode from "jsbarcode";
 import { 
   LayoutDashboard, 
   Plus, 
@@ -38,7 +40,8 @@ import {
   User,
   Phone,
   IndianRupee,
-  Save
+  Save,
+  Printer
 } from "lucide-react";
 
 // Register jspdf-autotable plugins dynamically
@@ -98,11 +101,65 @@ interface Bill {
   createdAt: any;
 }
 
+interface LocalBarcodeProps {
+  value: string;
+  height?: number;
+  width?: number;
+}
+
+const getBarcodeDataUrl = (value: string, height = 40, width = 2): string => {
+  if (typeof window === "undefined" || !value) return "";
+  try {
+    const canvas = document.createElement("canvas");
+    JsBarcode(canvas, value, {
+      format: "CODE128",
+      width: 2.0,
+      height: 40,
+      displayValue: true,
+      fontSize: 11,
+      fontOptions: "bold",
+      font: "monospace",
+      textMargin: 2,
+      margin: 6,
+      lineColor: "#000000",
+      background: "#ffffff"
+    });
+    return canvas.toDataURL("image/png");
+  } catch (err) {
+    console.error("Barcode generation error:", err);
+    return "";
+  }
+};
+
+const LocalBarcode: React.FC<LocalBarcodeProps> = ({ value, height = 45, width = 2 }) => {
+  const imgSrc = getBarcodeDataUrl(value, height, width);
+
+  if (!imgSrc) return <div className="w-full h-full bg-white" />;
+
+  return (
+    <img 
+      src={imgSrc} 
+      alt={value} 
+      className="w-full h-full object-contain block"
+      style={{
+        maxHeight: '100%',
+        maxWidth: '100%',
+        display: 'block',
+        margin: '0 auto',
+        imageRendering: 'pixelated',
+        WebkitPrintColorAdjust: 'exact',
+        printColorAdjust: 'exact'
+      }} 
+    />
+  );
+};
+
 export default function AdminDashboard() {
   const router = useRouter();
-  const [adminUser, setAdminUser] = useState<any>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [adminUser, setAdminUser] = useState<any>({ email: "admin@jskjewellery.com" });
+  const [authLoading, setAuthLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"dashboard" | "products" | "stock" | "billing" | "ledger" | "settings">("dashboard");
+  const [showProductForm, setShowProductForm] = useState(false);
 
   // State collections
   const [products, setProducts] = useState<Product[]>([]);
@@ -131,6 +188,17 @@ export default function AdminDashboard() {
   // Custom Settings States
   const [customCategories, setCustomCategories] = useState<string[]>(["Rings", "Necklaces", "Earrings", "Bangles", "Other"]);
   const [defaultGst, setDefaultGst] = useState({ cgst: 1.5, sgst: 1.5, igst: 0 });
+
+  // Bill Customization States
+  const [billFontSize, setBillFontSize] = useState<"small"|"medium"|"large"|"xlarge">("medium");
+  const [billFooterMsg, setBillFooterMsg] = useState("Thank You for Shopping With Us!");
+  const [billTermsText, setBillTermsText] = useState("Goods once sold will not be returned or exchanged.");
+  const [billShowGst, setBillShowGst] = useState(true);
+  const [billShowAmountWords, setBillShowAmountWords] = useState(true);
+  const [billShowMobile, setBillShowMobile] = useState(true);
+  const [billShowSignature, setBillShowSignature] = useState(true);
+  const [billShowPlaceOfSupply, setBillShowPlaceOfSupply] = useState(true);
+  const [billExtraNote, setBillExtraNote] = useState("");
 
   // Product Form State
   const [productForm, setProductForm] = useState({
@@ -179,14 +247,21 @@ export default function AdminDashboard() {
   const [restockProduct, setRestockProduct] = useState<Product | null>(null);
   
   // Barcode Tag States
-  const [barcodeTagProduct, setBarcodeTagProduct] = useState<Product | null>(null);
-  const [showBarcodeModal, setShowBarcodeModal] = useState(false);
-  const [barcodeQuantity, setBarcodeQuantity] = useState(1);
+  const [batchBarcodeItems, setBatchBarcodeItems] = useState<{[productId: string]: number}>({});
+  const [showBatchBarcodeModal, setShowBatchBarcodeModal] = useState(false);
+  const [printMode, setPrintMode] = useState<"barcode" | "bill" | "a4-bill" | null>(null);
+  const [activePrintBill, setActivePrintBill] = useState<any>(null);
+  const [billPrintSize, setBillPrintSize] = useState<"a4" | "thermal">("a4");
   const [barcodeLayout, setBarcodeLayout] = useState<"single" | "a4">("single");
   const [barcodeColumns, setBarcodeColumns] = useState(3);
   const [barcodeSkipLabels, setBarcodeSkipLabels] = useState(0);
   const [barcodeShowBorder, setBarcodeShowBorder] = useState(true);
-  const [barcodeTagSize, setBarcodeTagSize] = useState<"small" | "medium" | "large">("medium");
+  const [barcodeTagSize, setBarcodeTagSize] = useState<"small" | "medium" | "large" | "jewelry" | "tvs">("jewelry");
+  const [tagOrientation, setTagOrientation] = useState<"horizontal" | "rotate90" | "reverseLandscape">("horizontal");
+  const [customTagWidth, setCustomTagWidth] = useState<number>(80);
+  const [customTagHeight, setCustomTagHeight] = useState<number>(12);
+  const [customFontSize, setCustomFontSize] = useState<number>(8);
+  const [customBarcodeHeight, setCustomBarcodeHeight] = useState<number>(28);
   const [restockQty, setRestockQty] = useState("");
   const [restockCost, setRestockCost] = useState("");
   const [restockSellPrice, setRestockSellPrice] = useState("");
@@ -234,22 +309,19 @@ export default function AdminDashboard() {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       const activeEl = document.activeElement;
       
-      // If operator is typing inside inputs (like Customer Name/Phone), ignore global scans to prevent corruption
+      // If operator is typing inside inputs, ignore global scans to prevent corruption. Let inputs handle their own events.
       if (activeEl && (
         activeEl.tagName === "INPUT" || 
         activeEl.tagName === "TEXTAREA"
       )) {
-        const placeholder = activeEl.getAttribute("placeholder");
-        if (placeholder !== "Click here & scan barcode...") {
-          return;
-        }
+        return;
       }
 
       const currentTime = Date.now();
       
       // Scanner inputs are extremely fast (typically < 30ms interval)
-      // Reset buffer if delay is larger than 150ms to support clean scans
-      if (currentTime - lastKeyTime > 150) {
+      // Reset buffer if delay is larger than 500ms to support clean scans and avoid resetting during thread block
+      if (currentTime - lastKeyTime > 500) {
         buffer = "";
       }
 
@@ -376,6 +448,16 @@ export default function AdminDashboard() {
           if (idata.customRemark) setCustomRemark(idata.customRemark);
           if (idata.showBankDetails !== undefined) setShowBankDetails(idata.showBankDetails);
           if (idata.whatsappChannelUrl !== undefined) setWhatsappChannelUrl(idata.whatsappChannelUrl);
+          // Bill Customization
+          if (idata.billFontSize) setBillFontSize(idata.billFontSize);
+          if (idata.billFooterMsg !== undefined) setBillFooterMsg(idata.billFooterMsg);
+          if (idata.billTermsText !== undefined) setBillTermsText(idata.billTermsText);
+          if (idata.billShowGst !== undefined) setBillShowGst(idata.billShowGst);
+          if (idata.billShowAmountWords !== undefined) setBillShowAmountWords(idata.billShowAmountWords);
+          if (idata.billShowMobile !== undefined) setBillShowMobile(idata.billShowMobile);
+          if (idata.billShowSignature !== undefined) setBillShowSignature(idata.billShowSignature);
+          if (idata.billShowPlaceOfSupply !== undefined) setBillShowPlaceOfSupply(idata.billShowPlaceOfSupply);
+          if (idata.billExtraNote !== undefined) setBillExtraNote(idata.billExtraNote);
         }
         if (doc.id === "categories" && doc.data().list) {
           setCustomCategories(doc.data().list);
@@ -455,14 +537,45 @@ export default function AdminDashboard() {
 
       if (productForm.id) {
         // Edit existing
+        const existingProduct = products.find(p => p.id === productForm.id);
+        const oldStock = existingProduct ? existingProduct.stock : 0;
+        const newStock = Number(productForm.stock);
+        
         await updateDoc(doc(db, "products", productForm.id), productPayload);
+        
+        // Log purchase if stock increased
+        if (newStock > oldStock) {
+          const addedStock = newStock - oldStock;
+          const cost = productPayload.purchasePrice || 0;
+          await addDoc(collection(db, "purchases"), {
+            productId: productForm.id,
+            productName: productPayload.name,
+            quantity: addedStock,
+            purchasePrice: cost,
+            totalCost: addedStock * cost,
+            createdAt: serverTimestamp()
+          });
+        }
       } else {
         // Create new
-        await addDoc(collection(db, "products"), {
+        const docRef = await addDoc(collection(db, "products"), {
           ...productPayload,
           soldCount: 0,
           createdAt: serverTimestamp()
         });
+        
+        const initialStock = Number(productForm.stock);
+        if (initialStock > 0) {
+          const cost = productPayload.purchasePrice || 0;
+          await addDoc(collection(db, "purchases"), {
+            productId: docRef.id,
+            productName: productPayload.name,
+            quantity: initialStock,
+            purchasePrice: cost,
+            totalCost: initialStock * cost,
+            createdAt: serverTimestamp()
+          });
+        }
       }
 
       // Reset form
@@ -516,6 +629,8 @@ export default function AdminDashboard() {
       existingImageUrls: product.imageUrls || (product.imageUrl ? [product.imageUrl] : [])
     });
     setImageFiles([]);
+    setActiveTab("products");
+    setShowProductForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -537,7 +652,24 @@ export default function AdminDashboard() {
       return;
     }
     try {
+      const existingProduct = products.find(p => p.id === productId);
+      const oldStock = existingProduct ? existingProduct.stock : 0;
+      
       await updateDoc(doc(db, "products", productId), { stock: stockVal });
+      
+      // Log purchase if stock increased
+      if (existingProduct && stockVal > oldStock) {
+        const addedStock = stockVal - oldStock;
+        const cost = existingProduct.purchasePrice || 0;
+        await addDoc(collection(db, "purchases"), {
+          productId: existingProduct.id,
+          productName: existingProduct.name,
+          quantity: addedStock,
+          purchasePrice: cost,
+          totalCost: addedStock * cost,
+          createdAt: serverTimestamp()
+        });
+      }
       fetchData();
     } catch (err) {
       console.error(err);
@@ -890,331 +1022,372 @@ export default function AdminDashboard() {
   };
 
   // Create Bill & Upload PDF
-  const handleBillingSubmit = async (e: React.FormEvent, saveOnly = false) => {
+  const handleBillingSubmit = async (e: React.FormEvent, actionType: 'print-thermal' | 'print-a4' | 'whatsapp' | 'save-only' = 'print-a4') => {
     if (e) e.preventDefault();
-    if (!customerName || !customerPhone) {
-      alert("Please enter customer name and mobile number.");
+    
+    const finalCustomerName = customerName.trim() || "Walk-in Customer";
+    const finalCustomerPhone = customerPhone.trim() || "N/A";
+
+    if (actionType === 'whatsapp' && finalCustomerPhone === "N/A") {
+      alert("Please enter customer's mobile number to share via WhatsApp.");
       return;
     }
+
     setBillingSubmitLoading(true);
 
     try {
       const billNo = "JSK-" + Date.now().toString().slice(-6);
-      let downloadUrl = "";
-
       const cashVal = Number(amountPaidCash) || 0;
       const upiVal = Number(amountPaidUPI) || 0;
       const creditVal = Number(amountPaidCredit) || due;
       const totalPaid = cashVal + upiVal;
+      const saveOnly = actionType === 'save-only';
+      // 1. Immediately trigger A6 or thermal print if printing is requested
+      if (actionType === 'print-thermal' || actionType === 'print-a4') {
+        const billToPrint = {
+          billNo,
+          customerName: finalCustomerName,
+          customerPhone: finalCustomerPhone,
+          items: [...billItems],
+          subtotal,
+          discount: calculatedDiscount,
+          cgst,
+          sgst,
+          igst,
+          total,
+          amountPaid: totalPaid,
+          amountDue: due,
+          paymentStatus,
+          paymentMethod: paymentMethod === "Split" ? "Split" : paymentMethod,
+          createdAt: { seconds: Date.now() / 1000 }
+        };
+        setActivePrintBill(billToPrint);
+        
+        if (actionType === 'print-a4') {
+          setPrintMode("a4-bill");
+          document.body.classList.add("print-mode-a4-bill");
+          setTimeout(() => {
+            window.print();
+            setTimeout(() => {
+              document.body.classList.remove("print-mode-a4-bill");
+            }, 1000);
+          }, 100);
+        } else {
+          setPrintMode("bill");
+          document.body.classList.add("print-mode-bill");
+          setTimeout(() => {
+            window.print();
+            setTimeout(() => {
+              document.body.classList.remove("print-mode-bill");
+            }, 1000);
+          }, 100);
+        }
+      }
 
-      if (!saveOnly) {
-        try {
-          // Generate PDF doc
-          const docPdf = new jsPDF();
-          
-          // Draw Watermark
-          docPdf.setFont("helvetica", "bold");
-          docPdf.setFontSize(80);
-          docPdf.setTextColor(242, 238, 230); // Very light gold/gray watermark
-          docPdf.text("JSK", 105, 150, { angle: 45, align: "center" });
-          
-          // Draw Logo
-          const drawDiamondLogo = () => {
-            docPdf.setDrawColor(180, 140, 60); // Gold tone
-            docPdf.setLineWidth(0.5);
-            docPdf.line(22, 11, 32, 11); // top horizontal
-            docPdf.line(22, 11, 17, 17); // top left diagonal
-            docPdf.line(32, 11, 37, 17); // top right diagonal
-            docPdf.line(17, 17, 27, 27); // bottom left diagonal
-            docPdf.line(37, 17, 27, 27); // bottom right diagonal
-            docPdf.line(17, 17, 37, 17); // middle horizontal
-            docPdf.line(27, 11, 27, 27); // vertical center
-          };
+      // 2. Define background save and upload worker
+      const runBackgroundSave = async () => {
+        let finalDownloadUrl = "";
 
-          if (businessLogo) {
-            try {
-              docPdf.addImage(businessLogo, "PNG", 16, 10, 16, 16);
-            } catch (err) {
-              console.warn("Failed to render custom logo, falling back:", err);
+        // a. Generate & Upload PDF (unless save-only)
+        if (!saveOnly) {
+          try {
+            const docPdf = new jsPDF();
+            
+            // Draw Watermark
+            docPdf.setFont("helvetica", "bold");
+            docPdf.setFontSize(80);
+            docPdf.setTextColor(242, 238, 230); // Very light gold/gray watermark
+            docPdf.text("JSK", 105, 150, { angle: 45, align: "center" });
+            
+            // Draw Logo
+            const drawDiamondLogo = () => {
+              docPdf.setDrawColor(180, 140, 60); // Gold tone
+              docPdf.setLineWidth(0.5);
+              docPdf.line(22, 11, 32, 11); // top horizontal
+              docPdf.line(22, 11, 17, 17); // top left diagonal
+              docPdf.line(32, 11, 37, 17); // top right diagonal
+              docPdf.line(17, 17, 27, 27); // bottom left diagonal
+              docPdf.line(37, 17, 27, 27); // bottom right diagonal
+              docPdf.line(17, 17, 37, 17); // middle horizontal
+              docPdf.line(27, 11, 27, 27); // vertical center
+            };
+            
+            if (businessLogo) {
+              try {
+                docPdf.addImage(businessLogo, "PNG", 16, 10, 16, 16);
+              } catch (err) {
+                console.warn("Failed to render custom logo, falling back:", err);
+                drawDiamondLogo();
+              }
+            } else {
               drawDiamondLogo();
             }
-          } else {
-            drawDiamondLogo();
-          }
-          
-          // Brand Title
-          docPdf.setFont("helvetica", "bold");
-          docPdf.setFontSize(20);
-          docPdf.setTextColor(44, 38, 32);
-          docPdf.text(businessName, 43, 19);
-          
-          docPdf.setFont("helvetica", "normal");
-          docPdf.setFontSize(8.5);
-          docPdf.setTextColor(180, 140, 60);
-          docPdf.text(businessSub, 43, 24);
+            
+            // Brand Title
+            docPdf.setFont("helvetica", "bold");
+            docPdf.setFontSize(20);
+            docPdf.setTextColor(44, 38, 32);
+            docPdf.text(businessName, 43, 19);
+            
+            docPdf.setFont("helvetica", "normal");
+            docPdf.setFontSize(8.5);
+            docPdf.setTextColor(180, 140, 60);
+            docPdf.text(businessSub, 43, 24);
 
-          // Gold band decoration
-          docPdf.setFillColor(180, 140, 60);
-          docPdf.rect(14, 29, 182, 3, "F");
+            // Gold band decoration
+            docPdf.setFillColor(180, 140, 60);
+            docPdf.rect(14, 29, 182, 3, "F");
 
-          // Document Type Title
-          docPdf.setFont("helvetica", "bold");
-          docPdf.setFontSize(11);
-          docPdf.setTextColor(40, 40, 40);
-          docPdf.text("GST INVOICE", 90, 39);
-          docPdf.setFont("helvetica", "italic");
-          docPdf.setFontSize(7.5);
-          docPdf.setTextColor(120, 120, 120);
-          docPdf.text("(ORIGINAL FOR RECIPIENT)", 84, 43);
+            // Document Type Title
+            docPdf.setFont("helvetica", "bold");
+            docPdf.setFontSize(11);
+            docPdf.setTextColor(40, 40, 40);
+            docPdf.text("GST INVOICE", 90, 39);
+            docPdf.setFont("helvetica", "italic");
+            docPdf.setFontSize(7.5);
+            docPdf.setTextColor(120, 120, 120);
+            docPdf.text("(ORIGINAL FOR RECIPIENT)", 84, 43);
 
-          // --- SUPPLIER & INVOICE DETAILS ---
-          docPdf.setFont("helvetica", "bold");
-          docPdf.setFontSize(8.5);
-          docPdf.setTextColor(40, 40, 40);
-          docPdf.text(businessName, 14, 51);
-          
-          docPdf.setFont("helvetica", "normal");
-          docPdf.setFontSize(7.5);
-          docPdf.setTextColor(80, 80, 80);
-          
-          const addrLines = docPdf.splitTextToSize(businessAddress, 90);
-          docPdf.text(addrLines, 14, 56);
-          const addrHeight = addrLines.length * 4.5;
-          
-          docPdf.text(`GSTIN/UIN: ${businessGstin}`, 14, 56 + addrHeight);
-          docPdf.text(`E-Mail: ${businessEmail}`, 14, 60.5 + addrHeight);
-          if (businessInstagram) {
-            docPdf.text(`Instagram: ${businessInstagram}`, 14, 65 + addrHeight);
-          }
-
-          // Invoice Details
-          docPdf.setFont("helvetica", "bold");
-          docPdf.text("Invoice No.", 120, 51);
-          docPdf.text("Dated", 160, 51);
-          docPdf.setFont("helvetica", "normal");
-          docPdf.text(billNo, 120, 56);
-          docPdf.text(new Date().toLocaleDateString("en-IN", { day: '2-digit', month: 'short', year: 'numeric' }), 160, 56);
-          
-          docPdf.setFont("helvetica", "bold");
-          docPdf.text("Place of Supply", 120, 64);
-          docPdf.setFont("helvetica", "normal");
-          docPdf.text("At Chennai", 120, 68);
-
-          // Divider
-          docPdf.setDrawColor(220, 220, 220);
-          docPdf.line(14, 76, 196, 76);
-
-          // --- BUYER DETAILS ---
-          docPdf.setFont("helvetica", "bold");
-          docPdf.text("BUYER (CUSTOMER)", 14, 82);
-          docPdf.setFont("helvetica", "normal");
-          docPdf.text(`Name: ${customerName}`, 14, 87);
-          docPdf.text(`Mobile: ${customerPhone}`, 14, 91);
-          docPdf.text("State Name: Tamil Nadu, Code: 33", 14, 95);
-
-          // --- ITEMS TABLE ---
-          const tableData = billItems.map((item, index) => [
-            index + 1,
-            item.name,
-            item.productId ? (products.find(p => p.id === item.productId)?.size || "-") : "-",
-            `Rs. ${item.price.toLocaleString("en-IN")}`,
-            item.quantity,
-            `Rs. ${(item.price * item.quantity).toLocaleString("en-IN")}`
-          ]);
-
-          autoTable(docPdf, {
-            startY: 100,
-            head: [["Sl No.", "Description of Goods", "Size/Weight", "Unit Price", "Qty", "Amount"]],
-            body: tableData,
-            theme: "grid",
-            headStyles: { fillColor: [44, 38, 32], textColor: [250, 245, 235], fontStyle: "bold" },
-            styles: { fontSize: 8, cellPadding: 2 },
-            columnStyles: {
-              0: { cellWidth: 12 },
-              1: { cellWidth: 80 },
-              2: { cellWidth: 25, halign: "center" },
-              3: { cellWidth: 25, halign: "right" },
-              4: { cellWidth: 12, halign: "center" },
-              5: { cellWidth: 28, halign: "right" }
+            // --- SUPPLIER & INVOICE DETAILS ---
+            docPdf.setFont("helvetica", "bold");
+            docPdf.setFontSize(8.5);
+            docPdf.setTextColor(40, 40, 40);
+            docPdf.text(businessName, 14, 51);
+            
+            docPdf.setFont("helvetica", "normal");
+            docPdf.setFontSize(7.5);
+            docPdf.setTextColor(80, 80, 80);
+            
+            const addrLines = docPdf.splitTextToSize(businessAddress, 90);
+            docPdf.text(addrLines, 14, 56);
+            const addrHeight = addrLines.length * 4.5;
+            
+            docPdf.text(`GSTIN/UIN: ${businessGstin}`, 14, 56 + addrHeight);
+            docPdf.text(`E-Mail: ${businessEmail}`, 14, 60.5 + addrHeight);
+            if (businessInstagram) {
+              docPdf.text(`Instagram: ${businessInstagram}`, 14, 65 + addrHeight);
             }
-          });
 
-          const finalY = (docPdf as any).lastAutoTable.finalY + 8;
+            // Invoice Details
+            docPdf.setFont("helvetica", "bold");
+            docPdf.text("Invoice No.", 120, 51);
+            docPdf.text("Dated", 160, 51);
+            docPdf.setFont("helvetica", "normal");
+            docPdf.text(billNo, 120, 56);
+            docPdf.text(new Date().toLocaleDateString("en-IN", { day: '2-digit', month: 'short', year: 'numeric' }), 160, 56);
+            
+            docPdf.setFont("helvetica", "bold");
+            docPdf.text("Place of Supply", 120, 64);
+            docPdf.setFont("helvetica", "normal");
+            docPdf.text("At Chennai", 120, 68);
 
-          // --- TAXATION SUMMARY ---
-          docPdf.setFont("helvetica", "normal");
-          docPdf.setFontSize(7.5);
-          docPdf.setTextColor(80, 80, 80);
-          
-          docPdf.text(`Subtotal:`, 125, finalY);
-          docPdf.text(`Rs. ${subtotal.toLocaleString("en-IN")}`, 196, finalY, { align: "right" });
-          
-          docPdf.text(`Output CGST @ ${billCgst}%:`, 125, finalY + 4);
-          docPdf.text(`Rs. ${cgst.toLocaleString("en-IN")}`, 196, finalY + 4, { align: "right" });
-          
-          docPdf.text(`Output SGST @ ${billSgst}%:`, 125, finalY + 8);
-          docPdf.text(`Rs. ${sgst.toLocaleString("en-IN")}`, 196, finalY + 8, { align: "right" });
-          
-          if (igst > 0) {
-            docPdf.text(`Output IGST @ ${billIgst}%:`, 125, finalY + 12);
-            docPdf.text(`Rs. ${igst.toLocaleString("en-IN")}`, 196, finalY + 12, { align: "right" });
-          }
+            // Divider
+            docPdf.setDrawColor(220, 220, 220);
+            docPdf.line(14, 76, 196, 76);
 
-          const discountY = finalY + 12 + (igst > 0 ? 4 : 0);
-          docPdf.text(`Discount & Rounding:`, 125, discountY);
-          docPdf.text(`- Rs. ${calculatedDiscount.toLocaleString("en-IN")}`, 196, discountY, { align: "right" });
+            // --- BUYER DETAILS ---
+            docPdf.setFont("helvetica", "bold");
+            docPdf.text("BUYER (CUSTOMER)", 14, 82);
+            docPdf.setFont("helvetica", "normal");
+            docPdf.text(`Name: ${finalCustomerName}`, 14, 87);
+            docPdf.text(`Mobile: ${finalCustomerPhone}`, 14, 91);
+            docPdf.text("State Name: Tamil Nadu, Code: 33", 14, 95);
 
-          const totalY = discountY + 6;
-          docPdf.setFont("helvetica", "bold");
-          docPdf.setTextColor(44, 38, 32);
-          docPdf.text(`Grand Total:`, 125, totalY);
-          docPdf.text(`Rs. ${total.toLocaleString("en-IN")}`, 196, totalY, { align: "right" });
+            // --- ITEMS TABLE ---
+            const tableData = billItems.map((item, index) => [
+              index + 1,
+              item.name,
+              item.productId ? (products.find(p => p.id === item.productId)?.size || "-") : "-",
+              `Rs. ${item.price.toLocaleString("en-IN")}`,
+              item.quantity,
+              `Rs. ${(item.price * item.quantity).toLocaleString("en-IN")}`
+            ]);
 
-          // Amount in Words Box
-          docPdf.setFont("helvetica", "bold");
-          docPdf.setFontSize(7.5);
-          docPdf.text("Amount Chargeable (in words):", 14, finalY);
-          docPdf.setFont("helvetica", "normal");
-          const wordsLines = docPdf.splitTextToSize(numberToWords(total), 100);
-          docPdf.text(wordsLines, 14, finalY + 4);
+            autoTable(docPdf, {
+              startY: 100,
+              head: [["Sl No.", "Description of Goods", "Size/Weight", "Unit Price", "Qty", "Amount"]],
+              body: tableData,
+              theme: "grid",
+              headStyles: { fillColor: [44, 38, 32], textColor: [250, 245, 235], fontStyle: "bold" },
+              styles: { fontSize: 8, cellPadding: 2 },
+              columnStyles: {
+                0: { cellWidth: 12 },
+                1: { cellWidth: 80 },
+                2: { cellWidth: 25, halign: "center" },
+                3: { cellWidth: 25, halign: "right" },
+                4: { cellWidth: 12, halign: "center" },
+                5: { cellWidth: 28, halign: "right" }
+              }
+            });
 
-          // Tax Amount in Words Box
-          const totalTaxAmount = cgst + sgst + igst;
-          docPdf.setFont("helvetica", "bold");
-          docPdf.text("Tax Amount (in words):", 14, finalY + 14);
-          docPdf.setFont("helvetica", "normal");
-          const taxWordsLines = docPdf.splitTextToSize(numberToWords(totalTaxAmount), 100);
-          docPdf.text(taxWordsLines, 14, finalY + 18);
+            const finalY = (docPdf as any).lastAutoTable.finalY + 8;
 
-          // Divider separator
-          docPdf.setDrawColor(200, 200, 200);
-          docPdf.line(14, totalY + 8, 196, totalY + 8);
+            // --- TAXATION SUMMARY ---
+            docPdf.setFont("helvetica", "normal");
+            docPdf.setFontSize(7.5);
+            docPdf.setTextColor(80, 80, 80);
+            
+            docPdf.text(`Subtotal:`, 125, finalY);
+            docPdf.text(`Rs. ${subtotal.toLocaleString("en-IN")}`, 196, finalY, { align: "right" });
+            
+            docPdf.text(`Output CGST @ ${billCgst}%:`, 125, finalY + 4);
+            docPdf.text(`Rs. ${cgst.toLocaleString("en-IN")}`, 196, finalY + 4, { align: "right" });
+            
+            docPdf.text(`Output SGST @ ${billSgst}%:`, 125, finalY + 8);
+            docPdf.text(`Rs. ${sgst.toLocaleString("en-IN")}`, 196, finalY + 8, { align: "right" });
+            
+            if (igst > 0) {
+              docPdf.text(`Output IGST @ ${billIgst}%:`, 125, finalY + 12);
+              docPdf.text(`Rs. ${igst.toLocaleString("en-IN")}`, 196, finalY + 12, { align: "right" });
+            }
 
-          // --- REMARKS & BANK DETAILS ---
-          const footerY = totalY + 13;
-          docPdf.setFont("helvetica", "bold");
-          docPdf.text("Remarks:", 14, footerY);
-          docPdf.setFont("helvetica", "normal");
-          docPdf.setFontSize(6.5);
-          docPdf.setTextColor(120, 120, 120);
-          const remarksText = docPdf.splitTextToSize(customRemark || "No E-Way Bill is required.", 70);
-          docPdf.text(remarksText, 14, footerY + 3);
+            const discountY = finalY + 12 + (igst > 0 ? 4 : 0);
+            docPdf.text(`Discount & Rounding:`, 125, discountY);
+            docPdf.text(`- Rs. ${calculatedDiscount.toLocaleString("en-IN")}`, 196, discountY, { align: "right" });
 
-          // Bank Details or WhatsApp QR Code
-          if (showBankDetails) {
+            const totalY = discountY + 6;
+            docPdf.setFont("helvetica", "bold");
+            docPdf.setTextColor(44, 38, 32);
+            docPdf.text(`Grand Total:`, 125, totalY);
+            docPdf.text(`Rs. ${total.toLocaleString("en-IN")}`, 196, totalY, { align: "right" });
+
+            // Amount in Words Box
             docPdf.setFont("helvetica", "bold");
             docPdf.setFontSize(7.5);
-            docPdf.setTextColor(40, 40, 40);
-            docPdf.text("Company's Bank Details:", 90, footerY);
+            docPdf.text("Amount Chargeable (in words):", 14, finalY);
             docPdf.setFont("helvetica", "normal");
-            docPdf.text(`Bank Name : ${bankName}`, 90, footerY + 4);
-            docPdf.text(`A/c No.     : ${bankAccount}`, 90, footerY + 8);
-            docPdf.text(`IFSC Code : ${bankIfsc}`, 90, footerY + 12);
-          } else if (whatsappChannelUrl) {
-            try {
-              const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(whatsappChannelUrl)}`;
+            const wordsLines = docPdf.splitTextToSize(numberToWords(total), 100);
+            docPdf.text(wordsLines, 14, finalY + 4);
+
+            // Tax Amount in Words Box
+            const totalTaxAmount = cgst + sgst + igst;
+            docPdf.setFont("helvetica", "bold");
+            docPdf.text("Tax Amount (in words):", 14, finalY + 14);
+            docPdf.setFont("helvetica", "normal");
+            const taxWordsLines = docPdf.splitTextToSize(numberToWords(totalTaxAmount), 100);
+            docPdf.text(taxWordsLines, 14, finalY + 18);
+
+            // Divider separator
+            docPdf.setDrawColor(200, 200, 200);
+            docPdf.line(14, totalY + 8, 196, totalY + 8);
+
+            // --- REMARKS & BANK DETAILS ---
+            const footerY = totalY + 13;
+            docPdf.setFont("helvetica", "bold");
+            docPdf.text("Remarks:", 14, footerY);
+            docPdf.setFont("helvetica", "normal");
+            docPdf.setFontSize(6.5);
+            docPdf.setTextColor(120, 120, 120);
+            const remarksText = docPdf.splitTextToSize(customRemark || "No E-Way Bill is required.", 70);
+            docPdf.text(remarksText, 14, footerY + 3);
+
+            // Bank Details or WhatsApp QR Code
+            if (showBankDetails) {
               docPdf.setFont("helvetica", "bold");
               docPdf.setFontSize(7.5);
               docPdf.setTextColor(40, 40, 40);
-              docPdf.text("Join Our WhatsApp:", 90, footerY);
-              docPdf.addImage(qrCodeUrl, "JPEG", 90, footerY + 2, 12, 12);
-            } catch (err) {
-              console.warn("Failed to render WhatsApp channel QR on PDF:", err);
+              docPdf.text("Company's Bank Details:", 90, footerY);
+              docPdf.setFont("helvetica", "normal");
+              docPdf.text(`Bank Name : ${bankName}`, 90, footerY + 4);
+              docPdf.text(`A/c No.     : ${bankAccount}`, 90, footerY + 8);
+              docPdf.text(`IFSC Code : ${bankIfsc}`, 90, footerY + 12);
+            } else if (whatsappChannelUrl) {
+              try {
+                const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(whatsappChannelUrl)}`;
+                docPdf.setFont("helvetica", "bold");
+                docPdf.setFontSize(7.5);
+                docPdf.setTextColor(40, 40, 40);
+                docPdf.text("Join Our WhatsApp:", 90, footerY);
+                docPdf.addImage(qrCodeUrl, "JPEG", 90, footerY + 2, 12, 12);
+              } catch (err) {
+                console.warn("Failed to render WhatsApp channel QR on PDF:", err);
+              }
             }
-          }
 
-          // Signatures
-          docPdf.setFont("helvetica", "bold");
-          docPdf.text(`for ${businessName}`, 150, footerY);
-          docPdf.setFont("helvetica", "normal");
-          docPdf.setFontSize(6.5);
-          docPdf.text("Authorised Signatory", 153, footerY + 16);
-          
-          docPdf.text("Customer's Seal and Signature", 14, footerY + 16);
+            // Signatures
+            docPdf.setFont("helvetica", "bold");
+            docPdf.text(`for ${businessName}`, 150, footerY);
+            docPdf.setFont("helvetica", "normal");
+            docPdf.setFontSize(6.5);
+            docPdf.text("Authorised Signatory", 153, footerY + 16);
+            
+            docPdf.text("Customer's Seal and Signature", 14, footerY + 16);
 
-          docPdf.setDrawColor(180, 180, 180);
-          docPdf.line(150, footerY + 12, 190, footerY + 12); // Auth line
-          docPdf.line(14, footerY + 12, 60, footerY + 12); // Cust line
+            docPdf.setDrawColor(180, 180, 180);
+            docPdf.line(150, footerY + 12, 190, footerY + 12); // Auth line
+            docPdf.line(14, footerY + 12, 60, footerY + 12); // Cust line
 
-          // Convert PDF to Blob
-          const pdfBlob = docPdf.output("blob");
-          
-          try {
-            // Upload PDF to Firebase Storage
+            const pdfBlob = docPdf.output("blob");
             const pdfRef = ref(storage, `invoices/${billNo}.pdf`);
             const uploadResult = await uploadBytes(pdfRef, pdfBlob);
-            downloadUrl = await getDownloadURL(uploadResult.ref);
-          } catch (storageErr) {
-            console.error("Firebase Storage upload failed, downloading locally:", storageErr);
-            docPdf.save(`${billNo}.pdf`);
-            alert("Firebase Storage upload failed (Check Firebase configuration/permissions). Invoice PDF has been downloaded directly to your device.");
+            finalDownloadUrl = await getDownloadURL(uploadResult.ref);
+          } catch (pdfErr) {
+            console.error("Background PDF generation/upload failed:", pdfErr);
           }
-        } catch (pdfErr) {
-          console.error("PDF generation/compilation failed:", pdfErr);
-          alert("Error generating PDF invoice. The transaction will still be saved to the database.");
         }
-      }
 
-      // Save Invoice to Firestore
-      const billPayload: any = {
-        billNo,
-        customerName,
-        customerPhone,
-        items: billItems,
-        subtotal,
-        discount: calculatedDiscount,
-        cgst,
-        sgst,
-        igst,
-        total,
-        totalCost,
-        paymentStatus,
-        paymentMethod: paymentMethod === "Split" ? "Split" : paymentMethod,
-        amountPaid: totalPaid,
-        amountPaidCash: cashVal,
-        amountPaidUPI: upiVal,
-        amountPaidCredit: creditVal,
-        amountDue: due,
-        dueDate: dueDate || "",
-        pdfUrl: downloadUrl,
-        createdAt: serverTimestamp()
+        // b. Save Invoice to Firestore
+        const billPayload: any = {
+          billNo,
+          customerName: finalCustomerName,
+          customerPhone: finalCustomerPhone,
+          items: billItems,
+          subtotal,
+          discount: calculatedDiscount,
+          cgst,
+          sgst,
+          igst,
+          total,
+          totalCost,
+          paymentStatus,
+          paymentMethod: paymentMethod === "Split" ? "Split" : paymentMethod,
+          amountPaid: totalPaid,
+          amountPaidCash: cashVal,
+          amountPaidUPI: upiVal,
+          amountPaidCredit: creditVal,
+          amountDue: due,
+          dueDate: dueDate || "",
+          pdfUrl: finalDownloadUrl,
+          createdAt: serverTimestamp()
+        };
+
+        await addDoc(collection(db, "bills"), billPayload);
+
+        // c. Update product stocks and sold counts locally/database
+        for (const item of billItems) {
+          let matchingProd = null;
+          if (item.productId) {
+            matchingProd = products.find(p => p.id === item.productId);
+          } else {
+            matchingProd = products.find(p => p.name.trim().toLowerCase() === item.name.trim().toLowerCase());
+          }
+
+          if (matchingProd) {
+            const newStock = Math.max(0, matchingProd.stock - item.quantity);
+            const newSold = (matchingProd.soldCount || 0) + item.quantity;
+            await updateDoc(doc(db, "products", matchingProd.id), {
+              stock: newStock,
+              soldCount: newSold
+            });
+          }
+        }
+
+        // d. Sync data from database
+        fetchData();
+
       };
 
-      await addDoc(collection(db, "bills"), billPayload);
-
-      // Update product stocks and sold counts locally/database
-      for (const item of billItems) {
-        let matchingProd = null;
-        if (item.productId) {
-          matchingProd = products.find(p => p.id === item.productId);
-        } else {
-          matchingProd = products.find(p => p.name.trim().toLowerCase() === item.name.trim().toLowerCase());
-        }
-
-        if (matchingProd) {
-          const newStock = Math.max(0, matchingProd.stock - item.quantity);
-          const newSold = (matchingProd.soldCount || 0) + item.quantity;
-          await updateDoc(doc(db, "products", matchingProd.id), {
-            stock: newStock,
-            soldCount: newSold
-          });
-        }
+      // 3. Handle action flows
+      if (actionType === 'whatsapp') {
+        const shareText = `*JSK Art Jewellery Invoice*\n\nDear *${finalCustomerName}*,\nThank you for shopping with us.\n\n*Invoice No:* ${billNo}\n*Grand Total:* ₹${total.toLocaleString("en-IN")}\n*Amount Paid:* ₹${totalPaid.toLocaleString("en-IN")}\n*Amount Due:* ₹${due.toLocaleString("en-IN")}\n*Status:* ${paymentStatus}`;
+        const waUrl = `https://wa.me/91${finalCustomerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(shareText)}`;
+        window.open(waUrl, "_blank");
       }
 
-      if (!saveOnly) {
-        // Populate QR Modal states
-        const shareText = `*JSK Art Jewellery Invoice*\n\nDear *${customerName}*,\nThank you for shopping with us.\n\n*Invoice No:* ${billNo}\n*Grand Total:* ₹${total.toLocaleString("en-IN")}\n*Amount Paid:* ₹${totalPaid.toLocaleString("en-IN")}\n*Amount Due:* ₹${due.toLocaleString("en-IN")}\n*Status:* ${paymentStatus}\n\nYou can view and download your full GST invoice PDF here:\n${downloadUrl}`;
-        
-        setCurrentBillUrl(downloadUrl);
-        setCurrentBillNo(billNo);
-        setCurrentBillPhone(customerPhone);
-        setCurrentBillText(shareText);
-        setShowQrModal(true);
-      } else {
-        alert(`Invoice ${billNo} saved successfully without PDF generation!`);
-      }
+      // Run save operation in background asynchronously
+      runBackgroundSave().catch(console.error);
 
-      // Reset Billing form
+      // Reset Billing form immediately so the screen is available instantly
       setCustomerName("");
       setCustomerPhone("");
       setBillItems([{ productId: "", name: "", price: 0, quantity: 1, purchasePrice: 0, cgstRate: defaultGst.cgst, sgstRate: defaultGst.sgst, igstRate: defaultGst.igst }]);
@@ -1228,12 +1401,10 @@ export default function AdminDashboard() {
       setAmountPaidCredit("0");
       setDueDate("");
       setPaymentMethod("Cash");
-      
-      fetchData();
+      setBillingSubmitLoading(false);
     } catch (err) {
       console.error(err);
       alert("Failed to create bill: " + (err instanceof Error ? err.message : String(err)));
-    } finally {
       setBillingSubmitLoading(false);
     }
   };
@@ -1345,7 +1516,17 @@ export default function AdminDashboard() {
         businessInstagram,
         customRemark,
         showBankDetails,
-        whatsappChannelUrl
+        whatsappChannelUrl,
+        // Bill Customization
+        billFontSize,
+        billFooterMsg,
+        billTermsText,
+        billShowGst,
+        billShowAmountWords,
+        billShowMobile,
+        billShowSignature,
+        billShowPlaceOfSupply,
+        billExtraNote,
       });
       await setDoc(doc(db, "settings", "gst"), { 
         cgst: defaultGst.cgst, 
@@ -1512,7 +1693,9 @@ export default function AdminDashboard() {
   if (!adminUser) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#FAF8F5] to-[#F3EFE9] text-[#2C2620] font-sans flex flex-col md:flex-row">
+    <>
+      {/* Main Admin UI - Hidden when printing */}
+      <div id="admin-main-ui" className="min-h-screen bg-gradient-to-b from-[#FAF8F5] to-[#F3EFE9] text-[#2C2620] font-sans flex flex-col md:flex-row print:hidden">
       
       {/* Sidebar for Desktop / Bottom Nav for Mobile */}
       <aside className="w-full md:w-64 bg-amber-950 text-amber-50 shrink-0 border-r border-amber-900 flex flex-col justify-between py-6 px-4 md:sticky md:top-0 md:h-screen">
@@ -1747,9 +1930,29 @@ export default function AdminDashboard() {
             {/* TAB: PRODUCTS */}
             {activeTab === "products" && (
               <div className="space-y-8 animate-fade-in">
-                <h2 className="font-serif font-black text-2xl md:text-3xl text-amber-950">Product Inventory</h2>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <h2 className="font-serif font-black text-2xl md:text-3xl text-amber-950">Product Inventory</h2>
+                  {!showProductForm && (
+                    <button 
+                      onClick={() => {
+                        setProductForm({
+                          id: "", name: "", price: "", discountPrice: "", purchasePrice: "",
+                          cgst: defaultGst.cgst.toString(), sgst: defaultGst.sgst.toString(), igst: defaultGst.igst.toString(),
+                          stock: "", category: customCategories[0] || "Rings", description: "",
+                          lowStockThreshold: "5", size: "", videoUrl: "", barcode: "", existingImageUrls: []
+                        });
+                        setImageFiles([]);
+                        setShowProductForm(true);
+                      }}
+                      className="bg-amber-800 hover:bg-amber-900 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
+                    >
+                      + Add New Product
+                    </button>
+                  )}
+                </div>
 
                 {/* Add/Edit Product Form */}
+                {showProductForm && (
                 <form onSubmit={handleProductSubmit} className="bg-white p-6 rounded-2xl border border-amber-100/60 shadow-sm space-y-6">
                   <h3 className="font-serif font-bold text-lg text-amber-950 border-b border-amber-50 pb-2">
                     {productForm.id ? "Edit Product Details" : "Add New Jewelry Design"}
@@ -1985,54 +2188,70 @@ export default function AdminDashboard() {
                         <span>{productForm.id ? "Update Product" : "Publish & Save"}</span>
                       )}
                     </button>
-                    {productForm.id && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setProductForm({
-                            id: "",
-                            name: "",
-                            price: "",
-                            discountPrice: "",
-                            purchasePrice: "",
-                            cgst: defaultGst.cgst.toString(),
-                            sgst: defaultGst.sgst.toString(),
-                            igst: defaultGst.igst.toString(),
-                            stock: "",
-                            category: customCategories[0] || "Rings",
-                            description: "",
-                            lowStockThreshold: "5",
-                            size: "",
-                            videoUrl: "",
-                            barcode: "",
-                            existingImageUrls: []
-                          });
-                          setImageFiles([]);
-                        }}
-                        className="bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-xs px-4 py-2.5 rounded-xl transition-all cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProductForm({
+                          id: "",
+                          name: "",
+                          price: "",
+                          discountPrice: "",
+                          purchasePrice: "",
+                          cgst: defaultGst.cgst.toString(),
+                          sgst: defaultGst.sgst.toString(),
+                          igst: defaultGst.igst.toString(),
+                          stock: "",
+                          category: customCategories[0] || "Rings",
+                          description: "",
+                          lowStockThreshold: "5",
+                          size: "",
+                          videoUrl: "",
+                          barcode: "",
+                          existingImageUrls: []
+                        });
+                        setImageFiles([]);
+                        setShowProductForm(false);
+                      }}
+                      className="bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-xs px-4 py-2.5 rounded-xl transition-all cursor-pointer"
+                    >
+                      Cancel
+                    </button>
                   </div>
                 </form>
+                )}
 
                 {/* Inventory Table with search */}
                 <div className="bg-white rounded-2xl border border-amber-100/60 p-6 shadow-sm space-y-4">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0">
                     <h3 className="font-serif font-bold text-lg text-amber-950">Active Catalog</h3>
                     
-                    <div className="relative w-full sm:w-64">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-amber-700/60">
-                        <Search size={14} />
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+                      {Object.keys(batchBarcodeItems).length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPrintMode("barcode");
+                            setShowBatchBarcodeModal(true);
+                          }}
+                          className="bg-amber-800 hover:bg-amber-900 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center justify-center space-x-2 transition-all cursor-pointer shadow-md"
+                        >
+                          <FileText size={14} />
+                          <span>Print Barcodes ({Object.keys(batchBarcodeItems).length})</span>
+                        </button>
+                      )}
+                      
+                      <div className="relative w-full sm:w-64">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-amber-700/60">
+                          <Search size={14} />
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Search product..."
+                          value={productSearch}
+                          onChange={(e) => setProductSearch(e.target.value)}
+                          className="w-full pl-9 pr-4 py-1.5 rounded-full border border-amber-200 text-xs bg-amber-50/10 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                        />
                       </div>
-                      <input
-                        type="text"
-                        placeholder="Search product..."
-                        value={productSearch}
-                        onChange={(e) => setProductSearch(e.target.value)}
-                        className="w-full pl-9 pr-4 py-1.5 rounded-full border border-amber-200 text-xs bg-amber-50/10 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                      />
                     </div>
                   </div>
 
@@ -2043,6 +2262,24 @@ export default function AdminDashboard() {
                       <table className="w-full text-left text-xs whitespace-nowrap">
                         <thead className="bg-amber-50/50 text-amber-900 uppercase font-bold border-b border-amber-100">
                           <tr>
+                            <th className="p-3 w-8">
+                              <input
+                                type="checkbox"
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    const batch: {[key: string]: number} = {};
+                                    filteredProducts.forEach(p => {
+                                      if (p.barcode) batch[p.id] = 1;
+                                    });
+                                    setBatchBarcodeItems(batch);
+                                  } else {
+                                    setBatchBarcodeItems({});
+                                  }
+                                }}
+                                checked={filteredProducts.length > 0 && filteredProducts.every(p => !p.barcode || batchBarcodeItems[p.id] !== undefined)}
+                                className="rounded text-amber-800 focus:ring-amber-800 w-3.5 h-3.5 border-amber-200"
+                              />
+                            </th>
                             <th className="p-3">Design</th>
                             <th className="p-3">Category</th>
                             <th className="p-3">Barcode</th>
@@ -2057,6 +2294,26 @@ export default function AdminDashboard() {
                         <tbody className="divide-y divide-amber-50">
                           {filteredProducts.map(prod => (
                             <tr key={prod.id} className="hover:bg-amber-50/20">
+                              <td className="p-3 w-8">
+                                {prod.barcode ? (
+                                  <input
+                                    type="checkbox"
+                                    checked={batchBarcodeItems[prod.id] !== undefined}
+                                    onChange={(e) => {
+                                      const updated = { ...batchBarcodeItems };
+                                      if (e.target.checked) {
+                                        updated[prod.id] = 1;
+                                      } else {
+                                        delete updated[prod.id];
+                                      }
+                                      setBatchBarcodeItems(updated);
+                                    }}
+                                    className="rounded text-amber-800 focus:ring-amber-800 w-3.5 h-3.5 border-amber-200"
+                                  />
+                                ) : (
+                                  <span className="text-amber-900/10">-</span>
+                                )}
+                              </td>
                               <td className="p-3">
                                 <div className="flex items-center space-x-3">
                                   <img src={prod.imageUrls?.[0] || prod.imageUrl} alt={prod.name} className="w-10 h-10 object-cover rounded-lg border border-amber-100" />
@@ -2074,8 +2331,9 @@ export default function AdminDashboard() {
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        setBarcodeTagProduct(prod);
-                                        setShowBarcodeModal(true);
+                                        setBatchBarcodeItems({ [prod.id]: 1 });
+                                        setPrintMode("barcode");
+                                        setShowBatchBarcodeModal(true);
                                       }}
                                       className="text-[9px] text-amber-600 hover:text-amber-800 font-bold underline mt-0.5 text-left cursor-pointer"
                                     >
@@ -2340,12 +2598,11 @@ export default function AdminDashboard() {
                         onChange={(e) => {
                           const val = e.target.value;
                           setBarcodeSearchInput(val);
-                          handleBarcodeScan(val);
                         }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
                             e.preventDefault();
-                            handleBarcodeScan(barcodeSearchInput, true);
+                            handleBarcodeScan(e.currentTarget.value, true);
                           }
                         }}
                         className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-amber-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono font-bold"
@@ -2671,19 +2928,19 @@ export default function AdminDashboard() {
                   </div>
 
                   {/* Actions buttons */}
-                  <div className="flex flex-col sm:flex-row gap-4 pt-6">
+                  <div className="flex flex-col sm:flex-row gap-3 pt-6 w-full">
                     <button
-                      type="submit"
+                      type="button"
                       disabled={billingSubmitLoading}
-                      onClick={(e) => handleBillingSubmit(e, false)}
-                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm py-3.5 rounded-xl flex items-center justify-center space-x-2 shadow-lg transition-all cursor-pointer"
+                      onClick={(e) => handleBillingSubmit(e, 'print-a4')}
+                      className="flex-1 bg-amber-800 hover:bg-amber-900 text-white font-bold text-sm py-3.5 rounded-xl flex items-center justify-center space-x-2 shadow-lg transition-all cursor-pointer"
                     >
                       {billingSubmitLoading ? (
                         <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
                       ) : (
                         <>
-                          <Share2 size={16} />
-                          <span>Generate PDF & Share on WhatsApp</span>
+                          <Printer size={16} />
+                          <span>Save & Print A4 Invoice</span>
                         </>
                       )}
                     </button>
@@ -2691,15 +2948,31 @@ export default function AdminDashboard() {
                     <button
                       type="button"
                       disabled={billingSubmitLoading}
-                      onClick={(e) => handleBillingSubmit(e, true)}
-                      className="flex-1 bg-amber-800 hover:bg-amber-900 text-white font-bold text-sm py-3.5 rounded-xl flex items-center justify-center space-x-2 shadow-lg transition-all cursor-pointer"
+                      onClick={(e) => handleBillingSubmit(e, 'whatsapp')}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm py-3.5 rounded-xl flex items-center justify-center space-x-2 shadow-lg transition-all cursor-pointer"
+                    >
+                      {billingSubmitLoading ? (
+                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
+                      ) : (
+                        <>
+                          <Share2 size={16} />
+                          <span>Save & Share on WhatsApp</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={billingSubmitLoading}
+                      onClick={(e) => handleBillingSubmit(e, 'save-only')}
+                      className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold text-sm py-3.5 rounded-xl flex items-center justify-center space-x-2 shadow-lg transition-all cursor-pointer sm:max-w-[200px]"
                     >
                       {billingSubmitLoading ? (
                         <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
                       ) : (
                         <>
                           <Save size={16} />
-                          <span>Save Invoice Only (Update Stock)</span>
+                          <span>Save Only</span>
                         </>
                       )}
                     </button>
@@ -2966,15 +3239,51 @@ export default function AdminDashboard() {
                                   </button>
                                 )}
                                 {tx.type === "Sale" && tx.pdfUrl && (
-                                  <a
-                                    href={tx.pdfUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center space-x-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1.5 rounded transition-all cursor-pointer"
-                                  >
-                                    <FileText size={10} />
-                                    <span>View PDF</span>
-                                  </a>
+                                  <div className="inline-flex flex-wrap gap-1.5 items-center">
+                                    <a
+                                      href={tx.pdfUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center space-x-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1.5 rounded transition-all cursor-pointer"
+                                    >
+                                      <FileText size={10} />
+                                      <span>View PDF</span>
+                                    </a>
+                                    <button
+                                      onClick={() => {
+                                        setActivePrintBill(tx);
+                                        setPrintMode("a4-bill");
+                                        document.body.classList.add("print-mode-a4-bill");
+                                        setTimeout(() => {
+                                          window.print();
+                                          setTimeout(() => {
+                                            document.body.classList.remove("print-mode-a4-bill");
+                                          }, 1000);
+                                        }, 100);
+                                      }}
+                                      className="inline-flex items-center space-x-1 text-[10px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1.5 rounded transition-all cursor-pointer"
+                                    >
+                                      <Printer size={10} />
+                                      <span>Print A4</span>
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setActivePrintBill(tx);
+                                        setPrintMode("bill");
+                                        document.body.classList.add("print-mode-bill");
+                                        setTimeout(() => {
+                                          window.print();
+                                          setTimeout(() => {
+                                            document.body.classList.remove("print-mode-bill");
+                                          }, 1000);
+                                        }, 100);
+                                      }}
+                                      className="inline-flex items-center space-x-1 text-[10px] font-bold text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 px-2.5 py-1.5 rounded transition-all cursor-pointer"
+                                    >
+                                      <Printer size={10} />
+                                      <span>Print Thermal</span>
+                                    </button>
+                                  </div>
                                 )}
                               </td>
                             </tr>
@@ -3235,6 +3544,101 @@ export default function AdminDashboard() {
                         className="w-full border border-amber-200/80 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none"
                       />
                       <p className="text-[10px] text-amber-900/60 font-medium">If set, a QR code will be printed on the invoice allowing customers to scan and join your WhatsApp group or channel.</p>
+                    </div>
+                  </div>
+
+                  {/* ══ BILL CUSTOMIZATION SECTION ══ */}
+                  <div className="space-y-4">
+                    <h3 className="font-serif font-bold text-lg text-amber-950 border-b border-amber-50 pb-2 flex items-center gap-2">
+                      🧾 Bill / Invoice Customization
+                    </h3>
+
+                    {/* Font Size */}
+                    <div className="bg-amber-50/30 p-4 rounded-xl border border-amber-100/60 space-y-3">
+                      <label className="text-xs font-bold text-amber-900/80 block">📏 Bill Font Size</label>
+                      <div className="grid grid-cols-4 gap-2">
+                        {(["small","medium","large","xlarge"] as const).map(size => (
+                          <button
+                            key={size}
+                            type="button"
+                            onClick={() => setBillFontSize(size)}
+                            className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer capitalize ${
+                              billFontSize === size
+                                ? "bg-amber-800 text-white border-amber-800 shadow"
+                                : "bg-white text-amber-900 border-amber-200 hover:bg-amber-50"
+                            }`}
+                          >
+                            {size === "small" ? "Small (11px)" : size === "medium" ? "Medium (13px)" : size === "large" ? "Large (15px)" : "X-Large (17px)"}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-amber-900/50">Font size affects all text in the printed A4 invoice.</p>
+                    </div>
+
+                    {/* Show/Hide Toggles */}
+                    <div className="bg-amber-50/30 p-4 rounded-xl border border-amber-100/60 space-y-3">
+                      <label className="text-xs font-bold text-amber-900/80 block">👁️ Show / Hide Bill Sections</label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {[
+                          { id:"billShowGst", label:"Show GST Breakdown (CGST/SGST)", val:billShowGst, set:setBillShowGst },
+                          { id:"billShowAmountWords", label:"Show Amount in Words", val:billShowAmountWords, set:setBillShowAmountWords },
+                          { id:"billShowMobile", label:"Show Customer Mobile Number", val:billShowMobile, set:setBillShowMobile },
+                          { id:"billShowSignature", label:"Show Signature Lines", val:billShowSignature, set:setBillShowSignature },
+                          { id:"billShowPlaceOfSupply", label:"Show Place of Supply", val:billShowPlaceOfSupply, set:setBillShowPlaceOfSupply },
+                        ].map(item => (
+                          <div key={item.id} className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-amber-100">
+                            <input
+                              type="checkbox"
+                              id={item.id}
+                              checked={item.val}
+                              onChange={e => item.set(e.target.checked)}
+                              className="w-4 h-4 rounded text-amber-800 border-amber-300 focus:ring-amber-700 cursor-pointer"
+                            />
+                            <label htmlFor={item.id} className="text-xs font-semibold text-amber-900 cursor-pointer">{item.label}</label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Footer Message */}
+                    <div className="bg-amber-50/30 p-4 rounded-xl border border-amber-100/60 space-y-2">
+                      <label className="text-xs font-bold text-amber-900/80 block">💬 Bill Footer Message</label>
+                      <input
+                        type="text"
+                        value={billFooterMsg}
+                        onChange={e => setBillFooterMsg(e.target.value)}
+                        placeholder="e.g. Thank You for Shopping With Us!"
+                        className="w-full border border-amber-200/80 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      />
+                    </div>
+
+                    {/* Terms & Conditions */}
+                    <div className="bg-amber-50/30 p-4 rounded-xl border border-amber-100/60 space-y-2">
+                      <label className="text-xs font-bold text-amber-900/80 block">📋 Terms &amp; Conditions Text</label>
+                      <textarea
+                        value={billTermsText}
+                        onChange={e => setBillTermsText(e.target.value)}
+                        rows={2}
+                        placeholder="e.g. Goods once sold will not be returned or exchanged."
+                        className="w-full border border-amber-200/80 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 resize-none"
+                      />
+                    </div>
+
+                    {/* Extra Note */}
+                    <div className="bg-amber-50/30 p-4 rounded-xl border border-amber-100/60 space-y-2">
+                      <label className="text-xs font-bold text-amber-900/80 block">📝 Extra Note on Bill <span className="text-amber-900/40 font-normal">(optional — e.g. No E-way bill required / custom message)</span></label>
+                      <textarea
+                        value={billExtraNote}
+                        onChange={e => setBillExtraNote(e.target.value)}
+                        rows={2}
+                        placeholder="e.g. No E-Way bill required. Goods are GST exempt."
+                        className="w-full border border-amber-200/80 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 resize-none"
+                      />
+                    </div>
+
+                    {/* Live Preview Badge */}
+                    <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-xs text-green-800 font-medium">
+                      ✅ These settings apply to every A4 invoice you print. Click <strong>Save Settings</strong> below to save changes to database.
                     </div>
                   </div>
 
@@ -3613,7 +4017,6 @@ export default function AdminDashboard() {
                 className="w-full h-full object-contain"
               />
             </div>
-
             <div className="w-full pt-2">
               <button
                 onClick={() => setShowUpiQrModal(false)}
@@ -3625,200 +4028,123 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
-      {/* Barcode Tag Modal */}
-      {showBarcodeModal && barcodeTagProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:bg-white print:p-0">
-          <div className="bg-white rounded-3xl p-6 max-w-4xl w-full shadow-2xl border border-amber-100 flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-8 relative print:shadow-none print:border-none print:p-0 print:m-0 print:rounded-none">
+
+      {/* Batch Barcode Tag Modal */}
+      {showBatchBarcodeModal && Object.keys(batchBarcodeItems).length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
+          <div className="bg-white rounded-3xl p-6 max-w-5xl w-full shadow-2xl border border-amber-100 flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-8 relative max-h-[90vh] overflow-y-auto md:overflow-y-visible">
             
-            {/* Close Button - hidden in print */}
+            {/* Close Button */}
             <button
               onClick={() => {
-                setShowBarcodeModal(false);
-                setBarcodeTagProduct(null);
-                setBarcodeQuantity(1);
-                setBarcodeLayout("single");
-                setBarcodeColumns(3);
-                setBarcodeSkipLabels(0);
-                setBarcodeShowBorder(true);
-                setBarcodeTagSize("medium");
+                setShowBatchBarcodeModal(false);
+                setPrintMode(null);
               }}
-              className="absolute top-4 right-4 bg-amber-50 hover:bg-amber-100 text-amber-950 p-2 rounded-full font-bold text-xs cursor-pointer print:hidden z-10"
+              className="absolute top-4 right-4 bg-amber-50 hover:bg-amber-100 text-amber-950 p-2 rounded-full font-bold text-xs cursor-pointer"
             >
               ✕
             </button>
 
-            {/* Left Panel: Settings */}
-            <div className="w-full md:w-5/12 flex flex-col justify-between text-left space-y-4 print:hidden">
+            {/* Left Panel: Settings & Product List */}
+            <div className="w-full md:w-6/12 flex flex-col justify-between text-left space-y-6 max-h-[80vh] overflow-y-auto pr-2">
               <div>
-                <h3 className="font-serif font-black text-xl text-amber-950 pb-2 border-b border-amber-100">Barcode Print Settings</h3>
+                <h3 className="font-serif font-black text-xl text-amber-950 pb-2 border-b border-amber-100 flex items-center justify-between">
+                  <span>Batch Barcode Printing</span>
+                  <span className="text-xs bg-amber-100 text-amber-950 px-2 py-0.5 rounded-full font-bold">
+                    {Object.keys(batchBarcodeItems).length} Products Selected
+                  </span>
+                </h3>
                 
                 <div className="space-y-4 mt-4">
-                  {/* Layout Type Selection */}
+                  {/* Clean 1-Click Print Modal: Advanced settings handled internally */}
+
+                  {/* List of Selected Items & Qty Inputs */}
                   <div>
-                    <label className="text-[11px] font-bold text-amber-900/70 block mb-1.5">Print Layout Mode</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setBarcodeLayout("single");
-                          setBarcodeColumns(3);
-                        }}
-                        className={`py-2 px-3 rounded-xl font-bold text-xs border text-center transition-all cursor-pointer ${
-                          barcodeLayout === "single"
-                            ? "bg-amber-800 border-amber-800 text-white shadow-sm"
-                            : "bg-white border-amber-100 text-amber-900 hover:bg-amber-50"
-                        }`}
-                      >
-                        Single (Thermal)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setBarcodeLayout("a4");
-                        }}
-                        className={`py-2 px-3 rounded-xl font-bold text-xs border text-center transition-all cursor-pointer ${
-                          barcodeLayout === "a4"
-                            ? "bg-amber-800 border-amber-800 text-white shadow-sm"
-                            : "bg-white border-amber-100 text-amber-900 hover:bg-amber-50"
-                        }`}
-                      >
-                        A4 Sticker Sheet
-                      </button>
+                    <label className="text-[11px] font-bold text-amber-900/70 block mb-2">Configure Print Quantities</label>
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto border border-amber-100/60 p-2 rounded-xl bg-amber-50/5">
+                      {Object.entries(batchBarcodeItems).map(([prodId, qty]) => {
+                        const product = products.find(p => p.id === prodId);
+                        if (!product) return null;
+                        return (
+                          <div key={product.id} className="flex items-center justify-between bg-white p-2 rounded-lg border border-amber-100 shadow-sm text-xs gap-2">
+                            <div className="flex items-center space-x-2 min-w-0 flex-1">
+                              <img src={product.imageUrls?.[0] || product.imageUrl} alt={product.name} className="w-8 h-8 object-cover rounded border border-amber-100" />
+                              <div className="min-w-0 flex-1">
+                                <span className="font-bold text-amber-950 block truncate leading-tight">{product.name}</span>
+                                <span className="text-[9px] text-amber-900/60 font-mono block truncate">{product.barcode} | Size: {product.size || "-"}</span>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center space-x-1.5 shrink-0">
+                              <label className="text-[9px] font-bold text-amber-900/50">Qty:</label>
+                              <input
+                                type="number"
+                                min="1"
+                                value={qty}
+                                onChange={(e) => {
+                                  const val = Math.max(1, parseInt(e.target.value) || 1);
+                                  setBatchBarcodeItems({
+                                    ...batchBarcodeItems,
+                                    [product.id]: val
+                                  });
+                                }}
+                                className="w-12 px-1.5 py-0.5 bg-amber-50/30 rounded border border-amber-100 text-amber-950 font-bold text-xs text-center outline-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = { ...batchBarcodeItems };
+                                  delete updated[product.id];
+                                  setBatchBarcodeItems(updated);
+                                  if (Object.keys(updated).length === 0) {
+                                    setShowBatchBarcodeModal(false);
+                                  }
+                                }}
+                                className="text-rose-600 hover:text-rose-800 p-1 text-[10px] font-bold cursor-pointer"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-
-                  {/* Quantity Input */}
-                  <div>
-                    <label className="text-[11px] font-bold text-amber-900/70 block mb-1">Total Copies to Print</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="500"
-                      value={barcodeQuantity}
-                      onChange={(e) => setBarcodeQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-full px-3 py-2 bg-amber-50/30 rounded-xl border border-amber-100 text-amber-950 font-bold text-xs outline-none focus:border-amber-800 transition-all"
-                    />
-                  </div>
-
-                  {/* Tag Size Selection */}
-                  <div>
-                    <label className="text-[11px] font-bold text-amber-900/70 block mb-1">Tag Size</label>
-                    <div className="grid grid-cols-3 gap-1">
-                      {(["small", "medium", "large"] as const).map((sz) => (
-                        <button
-                          key={sz}
-                          type="button"
-                          onClick={() => {
-                            setBarcodeTagSize(sz);
-                            if (barcodeLayout === "a4") {
-                              if (sz === "small") setBarcodeColumns(4);
-                              else if (sz === "large") setBarcodeColumns(2);
-                              else setBarcodeColumns(3);
-                            }
-                          }}
-                          className={`py-1.5 px-2 rounded-lg text-[10px] font-bold border text-center transition-all capitalize cursor-pointer ${
-                            barcodeTagSize === sz
-                              ? "bg-amber-100 border-amber-800 text-amber-950"
-                              : "bg-white border-amber-100 text-amber-800 hover:bg-amber-50"
-                          }`}
-                        >
-                          {sz}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* A4 Specific Options */}
-                  {barcodeLayout === "a4" && (
-                    <div className="space-y-3 p-3 bg-amber-50/30 rounded-xl border border-amber-100/50 animate-fade-in">
-                      <div className="text-[10px] font-extrabold text-amber-950 uppercase tracking-wider mb-1">A4 Layout Details</div>
-                      
-                      {/* Columns Select */}
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="text-[10px] font-bold text-amber-900/70">Grid Columns</label>
-                          <span className="text-[9px] text-amber-900/50">Rec: {barcodeTagSize === 'small' ? '4-5' : barcodeTagSize === 'large' ? '2' : '3'}</span>
-                        </div>
-                        <select
-                          value={barcodeColumns}
-                          onChange={(e) => setBarcodeColumns(parseInt(e.target.value))}
-                          className="w-full px-2 py-1.5 bg-white rounded-lg border border-amber-100 text-amber-950 font-bold text-xs outline-none focus:border-amber-800 transition-all"
-                        >
-                          {[2, 3, 4, 5].map((col) => (
-                            <option key={col} value={col}>
-                              {col} Columns
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Skip Labels Input */}
-                      <div>
-                        <label className="text-[10px] font-bold text-amber-900/70 block mb-1">Skip Used Slots (to reuse sheet)</label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={barcodeSkipLabels}
-                          onChange={(e) => setBarcodeSkipLabels(Math.max(0, parseInt(e.target.value) || 0))}
-                          className="w-full px-2.5 py-1 bg-white rounded-lg border border-amber-100 text-amber-950 font-semibold text-xs outline-none focus:border-amber-800 transition-all"
-                        />
-                      </div>
-
-                      {/* Show Borders Checkbox */}
-                      <label className="flex items-center space-x-2 text-[10px] font-bold text-amber-900/70 cursor-pointer pt-1">
-                        <input
-                          type="checkbox"
-                          checked={barcodeShowBorder}
-                          onChange={(e) => setBarcodeShowBorder(e.target.checked)}
-                          className="rounded text-amber-800 focus:ring-amber-800 w-3.5 h-3.5 border-amber-200"
-                        />
-                        <span>Show cut borders (dashed lines)</span>
-                      </label>
-                    </div>
-                  )}
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="space-y-2 pt-4">
+              <div className="space-y-2 pt-2 border-t border-amber-100">
                 <button
                   onClick={() => {
-                    window.print();
+                    setPrintMode("barcode");
+                    document.body.classList.add("print-mode-barcode");
+                    setTimeout(() => {
+                      window.print();
+                      setTimeout(() => {
+                        document.body.classList.remove("print-mode-barcode");
+                        setPrintMode(null);
+                      }, 1000);
+                    }, 800);
                   }}
                   className="w-full py-3 bg-amber-800 hover:bg-amber-900 text-white rounded-xl font-bold text-xs flex items-center justify-center space-x-2 shadow-md hover:shadow-lg transition-all cursor-pointer"
                 >
                   <FileText size={14} />
-                  <span>Print Barcode Tag</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setShowBarcodeModal(false);
-                    setBarcodeTagProduct(null);
-                    setBarcodeQuantity(1);
-                    setBarcodeLayout("single");
-                    setBarcodeColumns(3);
-                    setBarcodeSkipLabels(0);
-                    setBarcodeShowBorder(true);
-                    setBarcodeTagSize("medium");
-                  }}
-                  className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-gray-500 rounded-xl font-bold text-xs transition-all cursor-pointer text-center"
-                >
-                  Close
+                  <span>Print Barcode Batch</span>
                 </button>
               </div>
             </div>
 
             {/* Right Panel: Live Preview */}
-            <div className="w-full md:w-7/12 bg-amber-50/10 rounded-2xl p-4 flex flex-col items-center justify-between border border-amber-100/50 print:hidden min-h-[300px] md:min-h-[450px]">
+            <div className="w-full md:w-6/12 bg-amber-50/10 rounded-2xl p-4 flex flex-col items-center justify-between border border-amber-100/50 min-h-[350px] md:min-h-[450px] max-h-[80vh] overflow-y-auto">
               <div className="w-full flex items-center justify-between pb-2 border-b border-amber-100/60 mb-4">
                 <span className="text-xs font-bold text-amber-950">Live Layout Preview</span>
                 <span className="text-[10px] font-semibold bg-amber-100 text-amber-950 px-2 py-0.5 rounded-full capitalize">
-                  {barcodeLayout === 'a4' ? `A4 Grid (${barcodeColumns} cols)` : `Single Tag (${barcodeTagSize})`}
+                  {barcodeLayout === 'a4' ? `A4 Grid (${barcodeColumns} cols)` : `Single Tag Stack (${barcodeTagSize})`}
                 </span>
               </div>
               
-              <div className="flex-1 w-full flex items-center justify-center overflow-auto max-h-[350px] p-2 bg-amber-50/5 rounded-xl border border-dashed border-amber-200">
+              <div className="flex-1 w-full flex items-center justify-center overflow-auto p-2 bg-amber-50/5 rounded-xl border border-dashed border-amber-200">
                 {barcodeLayout === 'a4' ? (
                   /* Miniature A4 Sheet */
                   <div className="bg-white shadow-lg border border-gray-200 p-3 w-[240px] aspect-[1/1.414] overflow-y-auto relative rounded">
@@ -3837,7 +4163,11 @@ export default function AdminDashboard() {
                       ))}
                       
                       {/* Barcode tags */}
-                      {Array.from({ length: Math.min(48, barcodeQuantity) }).map((_, i) => (
+                      {Object.entries(batchBarcodeItems).flatMap(([prodId, qty]) => {
+                        const product = products.find(p => p.id === prodId);
+                        if (!product) return [];
+                        return Array.from({ length: qty }).map(() => product);
+                      }).slice(0, 48).map((product, i) => (
                         <div 
                           key={i} 
                           className={`bg-amber-50/5 flex flex-col items-center justify-center p-1 rounded ${
@@ -3848,204 +4178,760 @@ export default function AdminDashboard() {
                           }}
                         >
                           <span className="text-[4px] font-black text-amber-950 scale-90 leading-none">{businessName.slice(0, 12)}...</span>
-                          <span className="text-[3.5px] text-amber-900/80 scale-90 leading-none truncate max-w-full">{barcodeTagProduct.name}</span>
+                          <span className="text-[3px] text-amber-900/80 scale-90 leading-none truncate max-w-full">{product.name}</span>
                           <div className="h-2 w-full bg-gray-200 my-0.5 rounded-sm flex items-center justify-center">
                             <span className="text-[3px] text-gray-500 scale-75 leading-none">|||||||||</span>
                           </div>
                           <div className="flex justify-between w-full text-[3.5px] scale-90 px-0.5 border-t border-dashed border-amber-200/50 leading-none">
-                            <span>S: {barcodeTagProduct.size || "-"}</span>
-                            <span>₹{barcodeTagProduct.price}</span>
+                            <span>S: {product.size || "-"}</span>
+                            <span>₹{product.price}</span>
                           </div>
                         </div>
                       ))}
-                      
-                      {barcodeQuantity > 48 && (
-                        <div className="col-span-full text-center text-[8px] text-amber-900/60 font-bold py-1">
-                          + {barcodeQuantity - 48} more labels in print output...
-                        </div>
-                      )}
                     </div>
                   </div>
                 ) : (
-                  /* Single tag / Stack preview */
-                  <div className="flex flex-col items-center justify-center space-y-2">
-                    <div className="text-[9px] text-amber-900/60 font-medium pb-1">Thermal Label Preview ({barcodeTagSize})</div>
-                    <div 
-                      className="border border-dashed border-amber-300 p-3 rounded-2xl bg-white flex flex-col items-center space-y-1.5 shadow-md"
-                      style={{
-                        width: barcodeTagSize === 'small' ? '160px' : barcodeTagSize === 'large' ? '240px' : '200px',
-                        height: barcodeTagSize === 'small' ? '80px' : barcodeTagSize === 'large' ? '130px' : '105px',
-                        justifyContent: 'space-between'
-                      }}
-                    >
-                      <span className="text-[9px] font-black text-amber-950 tracking-wide uppercase leading-none">{businessName}</span>
-                      <span className="text-[8px] font-bold text-amber-900/80 truncate max-w-full leading-none">{barcodeTagProduct.name}</span>
-                      
-                      {/* Barcode Image */}
-                      <div className="bg-white p-1 rounded border border-amber-100 flex items-center justify-center h-8 w-[85%]">
-                        <img
-                          src={`https://barcode.tec-it.com/barcode.ashx?data=${encodeURIComponent(barcodeTagProduct.barcode || "")}&code=Code128&translate-esc=true`}
-                          alt="Barcode"
-                          className="h-full object-contain"
-                        />
-                      </div>
-                      
-                      <span className="text-[8px] font-mono font-bold tracking-widest text-amber-950 leading-none">{barcodeTagProduct.barcode}</span>
-                      
-                      <div className="flex justify-between w-full text-[8px] font-bold text-amber-950 px-1 pt-1 border-t border-dashed border-amber-200 leading-none">
-                        <span>Size: {barcodeTagProduct.size || "-"}</span>
-                        <span>MRP: ₹{barcodeTagProduct.price.toLocaleString("en-IN")}</span>
-                      </div>
+                  /* Single tag / Stack preview list */
+                  <div className="flex flex-col items-center justify-center space-y-3 w-full p-2">
+                    <div className="text-[10px] font-extrabold text-amber-950 uppercase tracking-wider text-center">
+                      Live Tag Sticker Visual Preview
                     </div>
-                    {barcodeQuantity > 1 && (
-                      <div className="text-[9px] font-bold text-amber-950 bg-amber-100 px-3 py-1 rounded-full animate-pulse mt-2">
-                        Repeats {barcodeQuantity} times (separate pages)
-                      </div>
-                    )}
+
+                    {/* Simulated Tag Card */}
+                    {Object.entries(batchBarcodeItems).slice(0, 1).map(([prodId]) => {
+                      const product = products.find(p => p.id === prodId);
+                      if (!product) return null;
+
+                      const isRotated = tagOrientation === "rotate90";
+
+                      return (
+                        <div key={product.id} className="flex flex-col items-center justify-center p-3 bg-amber-50/30 rounded-xl w-full border border-amber-200/80 shadow-sm">
+                          <div className="text-[9px] font-bold text-amber-900/60 mb-2">
+                            Simulated Print Output ({customTagWidth}mm x {customTagHeight}mm)
+                          </div>
+                          
+                          <div 
+                            className="bg-white border-2 border-dashed border-amber-400/80 rounded-sm shadow-md flex items-center justify-between p-1 transition-all overflow-hidden"
+                            style={{
+                              width: '260px',
+                              height: isRotated ? '75px' : '50px',
+                              boxSizing: 'border-box'
+                            }}
+                          >
+                            {/* Printable Flap (60%) */}
+                            <div className="h-full flex flex-row items-center justify-between px-1.5 border-r border-dashed border-gray-300" style={{ width: '60%', boxSizing: 'border-box' }}>
+                              {/* Left side: Barcode (Tall Lines, NO barcode text string) */}
+                              <div className="h-full flex flex-col items-center justify-center w-[50%] overflow-hidden">
+                                <div className="w-full h-[95%] flex items-center justify-center">
+                                  <LocalBarcode value={product.barcode || ""} height={60} width={2.2} />
+                                </div>
+                              </div>
+
+                              {/* Right side: JSK & Price */}
+                              <div className="h-full flex flex-col items-start justify-center w-[50%] pl-1 text-left">
+                                <span className="text-[9px] font-black text-black uppercase leading-tight">JSK</span>
+                                <span className="text-[11px] font-black text-black leading-tight mt-0.5">₹{product.price.toLocaleString("en-IN")}</span>
+                                {product.size && <span className="text-[6px] font-bold text-gray-700 leading-tight">Size: {product.size}</span>}
+                              </div>
+                            </div>
+
+                            {/* Blank Tail Loop (40%) */}
+                            <div className="h-full bg-amber-50/40 flex items-center justify-center text-[7px] font-bold text-amber-300 uppercase tracking-widest" style={{ width: '40%' }}>
+                              Tail
+                            </div>
+                          </div>
+
+                          <div className="text-[9px] font-semibold text-amber-900/70 mt-2 flex items-center space-x-1">
+                            <span>Orientation:</span>
+                            <span className="font-extrabold text-amber-950">{isRotated ? "↔️ Leta (Rotate 90°)" : "↕️ Sidha"}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    <div className="flex flex-col space-y-1.5 w-full max-h-[140px] overflow-y-auto p-1 border-t border-amber-100 pt-2">
+                      <div className="text-[9px] font-bold text-amber-900/60">Batch Print Queue:</div>
+                      {Object.entries(batchBarcodeItems).map(([prodId, qty]) => {
+                        const product = products.find(p => p.id === prodId);
+                        if (!product) return null;
+                        return (
+                          <div key={product.id} className="border border-dashed border-amber-200 p-1.5 rounded-lg bg-white flex items-center justify-between w-full text-left">
+                            <span className="font-bold text-amber-950 text-xs truncate max-w-[150px]">{product.name}</span>
+                            <span className="bg-amber-100 text-amber-950 font-extrabold text-[10px] px-2 py-0.5 rounded-full">{qty} Tags</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
-              
-              <div className="text-[10px] text-amber-900/60 font-semibold text-center mt-3 max-w-sm">
-                💡 {barcodeLayout === 'a4' 
-                  ? "Ensure 'Paper Size' is set to A4 and margins are set to Default/None in print dialog." 
-                  : "Ensure browser print size matches your thermal roll dimensions (e.g. 50mm x 25mm)."}
-              </div>
             </div>
+            
+          </div>
+        </div>
+      )}
+      </div>
 
-            {/* Printable Container: Hidden on screen, shown when printing */}
-            <div id="printable-barcode-area" className="hidden print:block">
-              {barcodeLayout === "single" ? (
-                Array.from({ length: barcodeQuantity }).map((_, i) => (
-                  <div 
-                    key={i} 
-                    className="print-single-label-page text-center"
-                    style={{
-                      width: barcodeTagSize === 'small' ? '40mm' : barcodeTagSize === 'large' ? '65mm' : '50mm',
-                      height: barcodeTagSize === 'small' ? '20mm' : barcodeTagSize === 'large' ? '35mm' : '25mm',
-                      padding: '2px',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    <div className="flex flex-col items-center justify-center w-full h-full space-y-0.5">
-                      <span className="text-[8.5px] font-black text-amber-950 tracking-wide uppercase truncate max-w-full leading-tight">{businessName}</span>
-                      <span className="text-[7.5px] font-bold text-amber-900/80 truncate max-w-full leading-tight">{barcodeTagProduct.name}</span>
-                      
-                      <div className="bg-white p-0.5 flex items-center justify-center w-full max-w-[90%]">
-                        <img
-                          src={`https://barcode.tec-it.com/barcode.ashx?data=${encodeURIComponent(barcodeTagProduct.barcode || "")}&code=Code128&translate-esc=true`}
-                          alt="Barcode"
-                          style={{
-                            height: barcodeTagSize === 'small' ? '6mm' : barcodeTagSize === 'large' ? '12mm' : '9mm',
-                            objectFit: 'contain'
-                          }}
-                        />
-                      </div>
-                      
-                      <span className="text-[7.5px] font-mono font-bold tracking-wider text-amber-950 leading-none">{barcodeTagProduct.barcode}</span>
-                      
-                      <div className="flex justify-between w-full text-[7.5px] font-bold text-amber-950 px-1 pt-0.5 border-t border-dashed border-amber-200 leading-none">
-                        <span>S: {barcodeTagProduct.size || "-"}</span>
-                        <span>₹{barcodeTagProduct.price.toLocaleString("en-IN")}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
+      {/* Printable Barcode Area (Top Level) */}
+      {printMode === "barcode" && Object.keys(batchBarcodeItems).length > 0 && (
+        <div id="printable-barcode-area" style={{ display: 'none' }}>
+          {barcodeLayout === "single" ? (
+            Object.entries(batchBarcodeItems).flatMap(([prodId, qty]) => {
+              const product = products.find(p => p.id === prodId);
+              if (!product) return [];
+              return Array.from({ length: qty }).map((_, i) => ({ product, index: i }));
+            }).map(({ product, index }) => {
+              return (
                 <div 
-                  className="grid"
+                  key={`print-single-${product.id}-${index}`} 
+                  className="print-single-label-page"
                   style={{
-                    gridTemplateColumns: `repeat(${barcodeColumns}, minmax(0, 1fr))`,
-                    gap: barcodeTagSize === 'small' ? '6mm' : barcodeTagSize === 'large' ? '12mm' : '8mm',
-                    width: '100%'
+                    width: '80mm',
+                    height: '12mm',
+                    padding: '0',
+                    margin: '0',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    boxSizing: 'border-box',
+                    backgroundColor: '#ffffff'
                   }}
                 >
-                  {/* Skip empty labels */}
-                  {Array.from({ length: barcodeSkipLabels }).map((_, i) => (
-                    <div key={`skip-${i}`} className="w-full invisible" style={{
-                      height: barcodeTagSize === 'small' ? '20mm' : barcodeTagSize === 'large' ? '35mm' : '28mm',
-                    }} />
-                  ))}
-                  
-                  {/* Actual barcode labels */}
-                  {Array.from({ length: barcodeQuantity }).map((_, i) => (
+                  {/* LEFT FLAP: 50mm — Barcode (32mm) + JSK+Price (18mm) */}
+                  <div style={{ 
+                    width: '50mm',
+                    height: '12mm',
+                    flexShrink: 0,
+                    display: 'flex', 
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'flex-start',
+                    boxSizing: 'border-box',
+                    overflow: 'hidden',
+                    paddingTop: '0.3mm',
+                    paddingBottom: '0.3mm',
+                    paddingLeft: '0.3mm'
+                  }}>
+                    {/* Barcode — 32mm wide */}
+                    <div style={{ 
+                      width: '32mm', 
+                      height: '11.4mm', 
+                      flexShrink: 0,
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      boxSizing: 'border-box'
+                    }}>
+                      <LocalBarcode value={product.barcode || ""} height={38} width={1.8} />
+                    </div>
+
+                    {/* JSK + Price — 17.5mm wide */}
+                    <div style={{ 
+                      width: '17.5mm',
+                      height: '11.4mm',
+                      flexShrink: 0,
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      alignItems: 'flex-start', 
+                      justifyContent: 'center',
+                      paddingLeft: '0.8mm',
+                      boxSizing: 'border-box',
+                      overflow: 'hidden'
+                    }}>
+                      <span style={{ fontSize: '9pt', color: '#000', fontWeight: 900, textTransform: 'uppercase', lineHeight: '1', whiteSpace: 'nowrap', display: 'block' }}>JSK</span>
+                      <span style={{ fontSize: '10pt', color: '#000', fontWeight: 900, lineHeight: '1.1', whiteSpace: 'nowrap', display: 'block', marginTop: '0.3mm' }}>&#8377;{product.price.toLocaleString("en-IN")}</span>
+                      {product.size && <span style={{ fontSize: '6pt', color: '#444', fontWeight: 700, lineHeight: '1', whiteSpace: 'nowrap', display: 'block', marginTop: '0.2mm' }}>S:{product.size}</span>}
+                    </div>
+                  </div>
+
+                  {/* RIGHT TAIL: Blank — 30mm */}
+                  <div style={{ width: '30mm', height: '12mm', flexShrink: 0 }}></div>
+                </div>
+              );
+            })
+          ) : (
+            <div 
+              className="grid"
+              style={{
+                gridTemplateColumns: `repeat(${barcodeColumns}, minmax(0, 1fr))`,
+                gap: barcodeTagSize === 'small' ? '6mm' : barcodeTagSize === 'large' ? '12mm' : '8mm',
+                width: '100%'
+              }}
+            >
+              {/* Skip empty labels */}
+              {Array.from({ length: barcodeSkipLabels }).map((_, i) => (
+                <div key={`skip-${i}`} className="w-full invisible" style={{
+                  height: barcodeTagSize === 'small' ? '20mm' : barcodeTagSize === 'large' ? '35mm' : barcodeTagSize === 'jewelry' ? '12mm' : '28mm',
+                }} />
+              ))}
+              
+              {/* Actual barcode labels */}
+              {Object.entries(batchBarcodeItems).flatMap(([prodId, qty]) => {
+                const product = products.find(p => p.id === prodId);
+                if (!product) return [];
+                return Array.from({ length: qty }).map(() => product);
+              }).map((product, idx) => {
+                if (barcodeTagSize === "tvs") {
+                  return (
                     <div 
-                      key={i} 
-                      className={`flex flex-col items-center justify-center text-center p-2 bg-white ${
-                        barcodeShowBorder ? 'border border-dashed border-amber-300' : 'border-none'
+                      key={`print-grid-${product.id}-${idx}`} 
+                      className={`flex flex-row items-center justify-between p-1 bg-white ${
+                        barcodeShowBorder ? 'border border-dashed border-gray-400' : 'border-none'
                       }`}
                       style={{
-                        height: barcodeTagSize === 'small' ? '20mm' : barcodeTagSize === 'large' ? '35mm' : '28mm',
+                        width: '50mm',
+                        height: '25mm',
                         boxSizing: 'border-box',
                         overflow: 'hidden'
                       }}
                     >
-                      <span className="text-[8.5px] font-black text-amber-950 tracking-wide uppercase truncate max-w-full leading-tight">{businessName}</span>
-                      <span className="text-[7.5px] font-bold text-amber-900/80 truncate max-w-full leading-tight">{barcodeTagProduct.name}</span>
-                      
-                      <div className="bg-white p-0.5 flex items-center justify-center w-full max-w-[90%] my-0.5">
-                        <img
-                          src={`https://barcode.tec-it.com/barcode.ashx?data=${encodeURIComponent(barcodeTagProduct.barcode || "")}&code=Code128&translate-esc=true`}
-                          alt="Barcode"
-                          style={{
-                            height: barcodeTagSize === 'small' ? '6mm' : barcodeTagSize === 'large' ? '12mm' : '9mm',
-                            objectFit: 'contain'
-                          }}
-                        />
+                      {/* Left Side: Barcode Lines + Text */}
+                      <div className="w-[26mm] h-full flex flex-col items-center justify-center pr-1 border-r border-dashed border-gray-300" style={{ boxSizing: 'border-box' }}>
+                        <div className="bg-white p-0 flex items-center justify-center w-full" style={{ height: '14mm' }}>
+                          <LocalBarcode value={product.barcode || ""} height={55} width={2.0} />
+                        </div>
+                        <span style={{ display: 'block', fontSize: '8px', color: '#000000', fontWeight: 900, fontFamily: 'monospace', letterSpacing: '0.5px', lineHeight: '1', marginTop: '2px' }}>
+                          {product.barcode}
+                        </span>
                       </div>
-                      
-                      <span className="text-[7.5px] font-mono font-bold tracking-wider text-amber-950 leading-none">{barcodeTagProduct.barcode}</span>
-                      
-                      <div className="flex justify-between w-full text-[7.5px] font-bold text-amber-950 px-1 pt-0.5 border-t border-dashed border-amber-200 leading-none mt-0.5">
-                        <span>S: {barcodeTagProduct.size || "-"}</span>
-                        <span>₹{barcodeTagProduct.price.toLocaleString("en-IN")}</span>
+
+                      {/* Right Side: Product Title (Top) + Price (Bottom) - NO Store Name */}
+                      <div className="w-[22mm] h-full flex flex-col items-start justify-center pl-1.5 text-left" style={{ boxSizing: 'border-box' }}>
+                        <span style={{ 
+                          display: '-webkit-box', 
+                          WebkitLineClamp: 2, 
+                          WebkitBoxOrient: 'vertical', 
+                          fontSize: '8px', 
+                          color: '#000000', 
+                          fontWeight: 900, 
+                          lineHeight: '1.1',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          wordBreak: 'break-word'
+                        }}>
+                          {product.name}
+                        </span>
+                        {product.size && (
+                          <span style={{ display: 'block', fontSize: '7px', color: '#333333', fontWeight: 700, lineHeight: '1', marginTop: '2px' }}>
+                            S: {product.size}
+                          </span>
+                        )}
+                        <span style={{ 
+                          display: 'block', 
+                          fontSize: '11px', 
+                          color: '#000000', 
+                          fontWeight: 900, 
+                          lineHeight: '1', 
+                          marginTop: '3px',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          ₹{product.price.toLocaleString("en-IN")}
+                        </span>
                       </div>
                     </div>
-                  ))}
+                  );
+                }
+
+                if (barcodeTagSize === "jewelry") {
+                  return (
+                    <div 
+                      key={`print-grid-${product.id}-${idx}`} 
+                      className={`flex flex-row items-center justify-start p-0 bg-white mx-auto ${
+                        barcodeShowBorder ? 'border border-dashed border-gray-400' : 'border-none'
+                      }`}
+                      style={{
+                        width: '80mm',
+                        height: '12mm',
+                        boxSizing: 'border-box',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {/* Left Flap (50mm wide): Divided into Barcode (left) & Details (right) */}
+                      <div className="w-[50mm] h-[12mm] flex flex-row items-center justify-between px-1 py-0.5" style={{ boxSizing: 'border-box' }}>
+                        {/* Left half of flap: Barcode Lines + Text */}
+                        <div className="w-[24mm] h-full flex flex-col items-center justify-center space-y-0.5" style={{ boxSizing: 'border-box' }}>
+                          <div className="bg-white p-0 flex items-center justify-center w-full max-w-[98%]" style={{ height: '7.5mm' }}>
+                            <LocalBarcode value={product.barcode || ""} height={40} width={2.0} />
+                          </div>
+                          <span style={{ display: 'block', fontSize: '7.5px', color: '#000000', fontWeight: 900, fontFamily: 'monospace', letterSpacing: '0.5px', lineHeight: '1' }}>{product.barcode}</span>
+                        </div>
+
+                        {/* Right half of flap: Product Title (Top) + Price (Bottom) - NO Store Name */}
+                        <div className="w-[24mm] h-full flex flex-col items-start justify-center pl-1" style={{ boxSizing: 'border-box' }}>
+                          <span style={{ display: 'block', fontSize: '6.5px', color: '#000000', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', lineHeight: '1.1' }}>{product.name}</span>
+                          <span style={{ display: 'block', fontSize: '9px', color: '#000000', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: '100%', lineHeight: '1', marginTop: '2px' }}>₹{product.price.toLocaleString("en-IN")}</span>
+                          {product.size && <span style={{ display: 'block', fontSize: '6px', color: '#333333', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: '100%', lineHeight: '1', marginTop: '1px' }}>S: {product.size}</span>}
+                        </div>
+                      </div>
+
+                      {/* Right Tail (30mm wide): Completely Blank */}
+                      <div className="w-[30mm] h-full border-l border-dashed border-gray-200"></div>
+                    </div>
+                  );
+                }
+                
+                return (
+                <div 
+                  key={`print-grid-${product.id}-${idx}`} 
+                  className={`flex flex-col items-center justify-center text-center p-2 bg-white ${
+                    barcodeShowBorder ? 'border border-dashed border-amber-300' : 'border-none'
+                  }`}
+                  style={{
+                    height: barcodeTagSize === 'small' ? '20mm' : barcodeTagSize === 'large' ? '35mm' : '28mm',
+                    boxSizing: 'border-box',
+                    overflow: 'hidden'
+                  }}
+                >
+                  <div className="flex flex-col items-center justify-between w-full h-full pt-1 pb-1">
+                    <div className="bg-white flex items-center justify-center w-full max-w-[95%]" style={{ height: barcodeTagSize === 'small' ? '10mm' : barcodeTagSize === 'large' ? '20mm' : '15mm' }}>
+                      <LocalBarcode value={product.barcode || ""} height={80} width={2.5} />
+                    </div>
+                    
+                    <span style={{ fontSize: '10px', color: '#000000', fontWeight: 900, fontFamily: 'monospace', letterSpacing: '1px', lineHeight: '1' }}>{product.barcode}</span>
+                    
+                    <div className="flex justify-center w-full px-1 pt-0.5">
+                      <span style={{ fontSize: '12px', color: '#000000', fontWeight: 900 }}>₹{product.price.toLocaleString("en-IN")}</span>
+                    </div>
+                  </div>
                 </div>
-              )}
+              )})}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Printable Thermal Bill Area */}
+      {printMode === "bill" && activePrintBill && (
+        <div id="printable-bill-area" className="hidden print:block font-mono text-[9px] leading-tight text-black max-w-[76mm] mx-auto p-1 bg-white">
+          <div className="text-center space-y-0.5">
+            <h2 className="font-sans font-black text-base tracking-wide text-black uppercase leading-tight">{businessName}</h2>
+            <p className="text-[8px] font-bold text-gray-800 leading-none">Art Jewellery & Ornaments</p>
+            <p className="text-[7.5px] leading-none">Plot 14, Main Road, Chennai | GST: 33AAAAA1111A1Z1</p>
+            <p className="text-[7.5px] leading-none">Mob: +91 99999 99999</p>
+          </div>
+          
+          <div className="border-t border-b border-black border-dashed my-1.5 py-1 text-[7.5px] space-y-0.5">
+            <div className="flex justify-between">
+              <span>Bill No: {activePrintBill.billNo}</span>
+              <span>Date: {activePrintBill.createdAt?.seconds ? new Date(activePrintBill.createdAt.seconds * 1000).toLocaleDateString("en-IN") : new Date().toLocaleDateString("en-IN")}</span>
+            </div>
+            <div className="text-left font-bold">Cust Name: {activePrintBill.customerName} ({activePrintBill.customerPhone})</div>
+            <div className="text-left">Payment: {activePrintBill.paymentMethod || "Cash"}</div>
+          </div>
+          
+          <table className="w-full text-left text-[7.5px] border-collapse">
+            <thead>
+              <tr className="border-b border-black border-dashed font-bold">
+                <th className="pb-1 text-left w-3/5">Item</th>
+                <th className="pb-1 text-center w-1/5">Qty</th>
+                <th className="pb-1 text-right w-1/5">Price</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activePrintBill.items?.map((item: any, idx: number) => (
+                <tr key={idx} className="align-top">
+                  <td className="py-0.5 text-left truncate max-w-[40mm]">{item.name}</td>
+                  <td className="py-0.5 text-center">{item.quantity}</td>
+                  <td className="py-0.5 text-right">₹{(item.price * item.quantity).toLocaleString("en-IN")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          
+          <div className="border-t border-black border-dashed mt-1.5 pt-1.5 text-[8px] space-y-0.5 text-right font-bold">
+            <div className="flex justify-between">
+              <span>Subtotal:</span>
+              <span>₹{activePrintBill.subtotal?.toLocaleString("en-IN")}</span>
+            </div>
+            {(activePrintBill.cgst > 0 || activePrintBill.sgst > 0) && (
+              <div className="flex justify-between">
+                <span>GST:</span>
+                <span>₹{((activePrintBill.cgst || 0) + (activePrintBill.sgst || 0) + (activePrintBill.igst || 0)).toLocaleString("en-IN")}</span>
+              </div>
+            )}
+            {activePrintBill.discount > 0 && (
+              <div className="flex justify-between text-gray-800">
+                <span>Discount:</span>
+                <span>-₹{activePrintBill.discount?.toLocaleString("en-IN")}</span>
+              </div>
+            )}
+            <div className="flex justify-between border-t border-black border-double pt-1 text-[9.5px] font-black">
+              <span>GRAND TOTAL:</span>
+              <span>₹{activePrintBill.total?.toLocaleString("en-IN")}</span>
+            </div>
+            <div className="flex justify-between text-[7.5px] font-normal pt-0.5">
+              <span>Paid:</span>
+              <span>₹{activePrintBill.amountPaid?.toLocaleString("en-IN")}</span>
+            </div>
+            <div className="flex justify-between text-[7.5px] font-normal">
+              <span>Outstanding Due:</span>
+              <span>₹{activePrintBill.amountDue?.toLocaleString("en-IN")}</span>
+            </div>
+          </div>
+          
+          <div className="text-center text-[7.5px] border-t border-black border-dashed mt-2 pt-1">
+            <p className="font-bold">Thank You For Shopping With Us!</p>
+            <p className="text-[6.5px] text-gray-700 italic">No exchange or returns on discounted goods.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Printable A4 Bill Area (GST Tax Invoice) */}
+      {printMode === "a4-bill" && activePrintBill && (
+        <div id="printable-a4-bill-area" style={{display:'none'}} className="bg-white">
+          <div className="w-[210mm] h-[297mm] overflow-hidden bg-[#faf8f5] p-[10mm] font-sans text-amber-950 flex flex-col box-border" style={{fontSize: billFontSize === 'small' ? '11px' : billFontSize === 'large' ? '15px' : billFontSize === 'xlarge' ? '17px' : '13px'}}>
+            
+            {/* Brand Header */}
+            <div className="flex justify-between items-start pb-2 border-b-[4px] border-amber-800 shrink-0">
+              <div className="flex items-center space-x-3">
+                {businessLogo ? (
+                  <img src={businessLogo} alt="Logo" className="w-14 h-14 object-contain rounded-md border-2 border-amber-200 p-1 bg-white" />
+                ) : (
+                  <div className="w-14 h-14 border-2 border-amber-600 rounded-md flex items-center justify-center font-serif text-sm font-bold text-amber-700 bg-amber-50">
+                    Logo
+                  </div>
+                )}
+                <div>
+                  <div className="text-2xl font-black tracking-tight text-amber-950 uppercase">{businessName || "JSK ART JEWELLERY"}</div>
+                  <div className="text-[0.8em] text-amber-700/80 font-bold uppercase tracking-widest mt-0.5">{businessSub || "Wholesalers & Mfrs of Diamond and Gold Jewellery"}</div>
+                </div>
+              </div>
             </div>
 
-            {/* Dynamic CSS Styles for page layouts and media print overrides */}
-            <style dangerouslySetInnerHTML={{__html: `
-              @media print {
-                body {
-                  visibility: hidden !important;
-                  background: white !important;
-                  margin: 0 !important;
-                  padding: 0 !important;
-                }
-                #printable-barcode-area, #printable-barcode-area * {
-                  visibility: visible !important;
-                }
-                #printable-barcode-area {
-                  position: absolute !important;
-                  left: 0 !important;
-                  top: 0 !important;
-                  width: 100% !important;
-                  margin: 0 !important;
-                  padding: 0 !important;
-                  display: block !important;
-                }
-                @page {
-                  size: ${barcodeLayout === 'a4' ? 'A4 portrait' : barcodeTagSize === 'small' ? '40mm 20mm' : barcodeTagSize === 'large' ? '65mm 35mm' : '50mm 25mm'};
-                  margin: ${barcodeLayout === 'a4' ? '10mm' : '0'};
-                }
-                .print-single-label-page {
-                  page-break-after: always !important;
-                  break-after: page !important;
-                  display: flex !important;
-                  flex-direction: column !important;
-                  align-items: center !important;
-                  justify-content: center !important;
-                  box-sizing: border-box !important;
-                }
-              }
-            `}} />
+            {/* GST Invoice Header Banner */}
+            <div className="text-center my-3 bg-amber-50 py-1.5 border border-amber-200/60 rounded-lg shadow-sm shrink-0">
+              <div className="font-black text-lg tracking-widest text-amber-900 leading-tight">GST INVOICE</div>
+              <div className="text-[0.7em] text-amber-700 italic font-medium leading-tight">(ORIGINAL FOR RECIPIENT)</div>
+            </div>
+
+            {/* Details block */}
+            <div className="grid grid-cols-2 gap-4 pb-3 border-b-2 border-amber-100 text-[0.9em] shrink-0">
+              <div>
+                <div className="font-bold text-amber-800 mb-1 uppercase tracking-wider text-[0.8em]">SUPPLIER</div>
+                <div className="font-black text-[1.1em] text-amber-950 leading-tight">{businessName}</div>
+                <div className="text-amber-900/80 whitespace-pre-line leading-snug mt-0.5">{businessAddress}</div>
+                <div className="mt-1.5"><span className="font-bold text-amber-950">GSTIN:</span> <span className="font-medium">{businessGstin}</span></div>
+                <div className="mt-0.5"><span className="font-bold text-amber-950">Email:</span> <span className="font-medium">{businessEmail}</span></div>
+                {businessInstagram && <div className="mt-0.5"><span className="font-bold text-amber-950">Instagram:</span> <span className="font-medium">{businessInstagram}</span></div>}
+              </div>
+              <div>
+                <div className="font-bold text-amber-800 mb-1 uppercase tracking-wider text-[0.8em]">INVOICE METADATA</div>
+                <table className="w-full text-left mt-0.5">
+                  <tbody>
+                    <tr>
+                      <td className="font-bold py-0.5 text-amber-950 w-28">Invoice No:</td>
+                      <td className="text-amber-900 font-medium py-0.5">{activePrintBill.billNo}</td>
+                    </tr>
+                    <tr>
+                      <td className="font-bold py-0.5 text-amber-950">Date:</td>
+                      <td className="text-amber-900 font-medium py-0.5">
+                        {activePrintBill.createdAt?.seconds
+                          ? new Date(activePrintBill.createdAt.seconds * 1000).toLocaleDateString("en-IN", { day: '2-digit', month: 'short', year: 'numeric' })
+                          : new Date().toLocaleDateString("en-IN", { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </td>
+                    </tr>
+                    {billShowPlaceOfSupply && (
+                      <tr>
+                        <td className="font-bold py-0.5 text-amber-950">Place of Supply:</td>
+                        <td className="text-amber-900 font-medium py-0.5">Tamil Nadu (33)</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Buyer Details */}
+            <div className="py-2.5 border-b-2 border-amber-100 text-[0.9em] shrink-0">
+              <div className="font-bold text-amber-800 mb-1.5 uppercase tracking-wider text-[0.8em]">BUYER (CUSTOMER)</div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="flex items-baseline gap-2 mb-0.5"><span className="text-amber-900">Name:</span> <span className="font-bold text-[1.1em] text-amber-950">{activePrintBill.customerName}</span></div>
+                  {billShowMobile && activePrintBill.customerPhone && activePrintBill.customerPhone !== 'N/A' && (
+                    <div className="flex items-baseline gap-2 mb-0.5"><span className="text-amber-900">Mobile:</span> <span className="font-semibold text-amber-950">{activePrintBill.customerPhone}</span></div>
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-baseline gap-2 mb-0.5"><span className="text-amber-900">Payment:</span> <span className="font-semibold text-amber-950">{activePrintBill.paymentMethod || 'Cash'}</span></div>
+                  {billShowPlaceOfSupply && (
+                    <div className="flex items-baseline gap-2 mb-0.5"><span className="text-amber-900">State:</span> <span className="font-semibold text-amber-950">Tamil Nadu, Code: 33</span></div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Items Grid */}
+            <div className="flex-grow flex flex-col min-h-0">
+              <table className="w-full text-left text-[0.9em] mt-3 mb-1 border-collapse">
+                <thead>
+                  <tr className="bg-amber-950 text-white font-bold">
+                    <th className="p-1.5 rounded-l-md w-10 text-center">Sl</th>
+                    <th className="p-1.5">Description</th>
+                    <th className="p-1.5 text-center w-20">Size/Wt</th>
+                    <th className="p-1.5 text-right w-24">Price</th>
+                    <th className="p-1.5 text-center w-12">Qty</th>
+                    <th className="p-1.5 text-right rounded-r-md w-28">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activePrintBill.items?.map((item: any, idx: number) => (
+                    <tr key={idx} className="border-b border-amber-200/50">
+                      <td className="p-1.5 text-center font-semibold text-amber-900">{idx + 1}</td>
+                      <td className="p-1.5 font-bold text-amber-950">{item.name}</td>
+                      <td className="p-1.5 text-center text-amber-900">{item.size || '—'}</td>
+                      <td className="p-1.5 text-right font-medium text-amber-900">₹{Number(item.price).toLocaleString('en-IN', {minimumFractionDigits:2})}</td>
+                      <td className="p-1.5 text-center font-bold text-amber-950">{item.quantity}</td>
+                      <td className="p-1.5 text-right font-bold text-amber-950">₹{(Number(item.price) * Number(item.quantity)).toLocaleString('en-IN', {minimumFractionDigits:2})}</td>
+                    </tr>
+                  ))}
+                  {/* Empty rows removed to prevent overflow */}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Taxation calculation */}
+            <div className="grid grid-cols-2 gap-4 text-[0.9em] mt-2 pt-2 border-t-2 border-amber-950 shrink-0">
+              <div className="pr-4">
+                {billShowAmountWords && (
+                  <>
+                    <div className="font-bold text-amber-800">Amount Chargeable (in words):</div>
+                    <div className="italic font-bold text-amber-950 mt-0.5 leading-snug text-[0.9em]">
+                      {numberToWords(Number(activePrintBill.total) || 0)}
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="text-right space-y-1 text-amber-900">
+                <div className="flex justify-end gap-4">
+                  <span className="w-28">Subtotal:</span>
+                  <span className="font-bold text-amber-950 w-24">₹{Number(activePrintBill.subtotal).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                </div>
+                {Number(activePrintBill.discount) > 0 && (
+                  <div className="flex justify-end gap-4 text-emerald-700">
+                    <span className="w-28">Discount:</span>
+                    <span className="font-bold w-24">-₹{Number(activePrintBill.discount).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                  </div>
+                )}
+                {billShowGst && Number(activePrintBill.cgst) > 0 && (
+                  <div className="flex justify-end gap-4">
+                    <span className="w-28">CGST @ {activePrintBill.cgstRate || '1.5'}%:</span>
+                    <span className="font-bold text-amber-950 w-24">₹{Number(activePrintBill.cgst).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                  </div>
+                )}
+                {billShowGst && Number(activePrintBill.sgst) > 0 && (
+                  <div className="flex justify-end gap-4">
+                    <span className="w-28">SGST @ {activePrintBill.sgstRate || '1.5'}%:</span>
+                    <span className="font-bold text-amber-950 w-24">₹{Number(activePrintBill.sgst).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                  </div>
+                )}
+                <div className="flex justify-end gap-4 border-t border-dashed border-amber-300 pt-1.5 mt-1 text-[1.1em] font-black text-amber-950">
+                  <span className="w-28 uppercase">Grand Total:</span>
+                  <span className="text-[1.2em] w-24">₹{Number(activePrintBill.total).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                </div>
+                
+                <div className="flex justify-end gap-4 pt-0.5 font-bold text-amber-800">
+                  <span className="w-28">Amount Paid:</span>
+                  <span className="w-24">₹{Number(activePrintBill.amountPaid).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                </div>
+                {Number(activePrintBill.amountDue) > 0 && (
+                  <div className="flex justify-end gap-4 pt-0.5 font-black text-rose-700">
+                    <span className="w-28">Balance Due:</span>
+                    <span className="w-24">₹{Number(activePrintBill.amountDue).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Bank Details & remarks */}
+            <div className="grid grid-cols-2 gap-4 border-t-2 border-amber-200 pt-2 mt-2 text-[0.8em] leading-relaxed shrink-0">
+              <div className="space-y-2">
+                {billTermsText && (
+                  <div>
+                    <div className="font-bold text-amber-900 mb-0.5">Terms & Conditions:</div>
+                    <div className="text-amber-900/80 italic whitespace-pre-line leading-tight pr-4">{billTermsText}</div>
+                  </div>
+                )}
+                {billExtraNote && (
+                  <div>
+                    <div className="font-bold text-amber-900 mb-0.5">Remarks:</div>
+                    <div className="text-amber-950/80 whitespace-pre-line leading-tight pr-4">{billExtraNote}</div>
+                  </div>
+                )}
+              </div>
+              
+              {showBankDetails ? (
+                <div className="bg-white p-2 rounded-lg border border-amber-200 shadow-sm self-start">
+                  <div className="font-bold text-amber-900 mb-1 uppercase tracking-wide text-[0.85em]">Company Bank Details</div>
+                  <div className="text-amber-950 font-medium">
+                    <div className="grid grid-cols-[50px_1fr] gap-1 mb-0.5">
+                      <span className="text-amber-700/80">Bank:</span>
+                      <span>{bankName}</span>
+                    </div>
+                    <div className="grid grid-cols-[50px_1fr] gap-1 mb-0.5">
+                      <span className="text-amber-700/80">A/c No:</span>
+                      <span className="font-bold tracking-wider">{bankAccount}</span>
+                    </div>
+                    <div className="grid grid-cols-[50px_1fr] gap-1">
+                      <span className="text-amber-700/80">IFSC:</span>
+                      <span className="font-bold tracking-wider">{bankIfsc}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : <div></div>}
+            </div>
+
+            {/* Footer Signatures */}
+            {billShowSignature && (
+              <div className="flex justify-between items-end pt-8 mt-2 text-[0.8em] font-semibold text-amber-900/80 shrink-0">
+                <div>
+                  <div className="border-b-2 border-amber-300 w-32 mb-1"></div>
+                  <div className="text-center">Customer's Signature</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[0.8em] text-amber-900/60 font-bold mb-6 uppercase">for {businessName}</div>
+                  <div className="border-b-2 border-amber-300 w-40 ml-auto mb-1"></div>
+                  <div className="text-center">Authorised Signatory</div>
+                </div>
+              </div>
+            )}
+
+            {/* Footer Banner */}
+            {billFooterMsg && (
+              <div className="text-center mt-2 py-1.5 bg-amber-950 text-amber-50 text-[0.8em] font-bold tracking-widest uppercase rounded shrink-0">
+                {billFooterMsg}
+              </div>
+            )}
 
           </div>
         </div>
       )}
-    </div>
+
+
+      {/* Global CSS Stylesheet for printing overrides */}
+
+      <style dangerouslySetInnerHTML={{__html: `
+        @media print {
+          /* --- BASE: Hide everything by default --- */
+          body {
+            background: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          /* Hide the entire admin UI panel */
+          #admin-main-ui {
+            display: none !important;
+          }
+
+          /* Hide all other divs by default in print */
+          body > div:not(#printable-barcode-area):not(#printable-bill-area):not(#printable-a4-bill-area) {
+            display: none !important;
+          }
+
+          /* --- BARCODE MODE --- */
+          body.print-mode-barcode #printable-barcode-area {
+            display: block !important;
+            visibility: visible !important;
+            position: static !important;
+            width: 80mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          body.print-mode-barcode #printable-barcode-area * {
+            visibility: visible !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          /* --- BILL MODE --- */
+          body.print-mode-bill #printable-bill-area,
+          body.print-mode-bill #printable-bill-area * {
+            visibility: visible !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          body.print-mode-bill #printable-bill-area {
+            display: block !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          /* --- A4 BILL MODE --- */
+          body.print-mode-a4-bill #printable-a4-bill-area {
+            display: block !important;
+            visibility: visible !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 210mm !important;
+            box-sizing: border-box !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          body.print-mode-a4-bill #printable-a4-bill-area * {
+            visibility: visible !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          /* --- SINGLE LABEL PAGE RULES --- */
+          .print-single-label-page {
+            page-break-after: always !important;
+            break-after: page !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            display: flex !important;
+            box-sizing: border-box !important;
+            width: 80mm !important;
+            height: 12mm !important;
+            max-height: 12mm !important;
+            overflow: hidden !important;
+            background: white !important;
+          }
+
+          /* No page break after the very last label */
+          .print-single-label-page:last-child {
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+          }
+        }
+      `}} />
+
+
+      {/* Dynamic @page size stylesheet */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @media print {
+          @page {
+            size: ${
+              printMode === "a4-bill" 
+                ? "A4 portrait"
+                : printMode === "bill"
+                ? "80mm auto"
+                : barcodeLayout === "a4"
+                ? "A4 portrait"
+                : "80mm 12mm landscape"
+            };
+            margin: 5mm 0mm 0mm 0mm !important;
+          }
+
+          body.print-mode-barcode {
+            width: 80mm !important;
+          }
+
+          body.print-mode-barcode #printable-barcode-area {
+            width: 80mm !important;
+            height: auto !important;
+          }
+        }
+      `}} />
+    </>
   );
 }
