@@ -221,6 +221,7 @@ export default function AdminDashboard() {
     existingImageUrls: [] as string[]
   });
   const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [isDraggingImage, setIsDraggingImage] = useState(false);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [productSubmitLoading, setProductSubmitLoading] = useState(false);
 
@@ -2132,53 +2133,138 @@ export default function AdminDashboard() {
                       {videoFile && <p className="text-[10px] text-emerald-700 font-semibold truncate">Selected: {videoFile.name}</p>}
                     </div>
 
-                    <div className="space-y-1 md:col-span-3">
-                      <label className="text-xs font-bold text-amber-900/70 flex items-center space-x-1">
-                        <Upload size={14} />
-                        <span>Product Images (Multiple allowed)</span>
+                    <div className="space-y-2 md:col-span-3">
+                      <label className="text-xs font-bold text-amber-900/80 flex items-center justify-between">
+                        <span className="flex items-center space-x-1">
+                          <Upload size={14} className="text-amber-700" />
+                          <span>Product Images (Multiple allowed)</span>
+                        </span>
+                        <span className="text-[10px] text-amber-700/70 font-normal">
+                          Drag & drop photos or click to upload
+                        </span>
                       </label>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        onChange={(e) => {
-                          if (e.target.files) {
-                            setImageFiles(Array.from(e.target.files));
+                      
+                      {/* Drag & Drop Upload Zone */}
+                      <div
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setIsDraggingImage(true);
+                        }}
+                        onDragLeave={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setIsDraggingImage(false);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setIsDraggingImage(false);
+                          if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                            const droppedFiles = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/"));
+                            if (droppedFiles.length > 0) {
+                              setImageFiles(prev => [...prev, ...droppedFiles]);
+                            }
                           }
                         }}
-                        className="w-full text-xs text-amber-800 file:mr-4 file:py-1.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-amber-900 hover:file:bg-amber-200 cursor-pointer"
-                      />
+                        onClick={() => {
+                          document.getElementById("product-images-input")?.click();
+                        }}
+                        className={`relative border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center space-y-2.5 ${
+                          isDraggingImage
+                            ? "border-amber-600 bg-amber-100/80 scale-[1.01] shadow-md"
+                            : "border-amber-300/80 bg-amber-50/40 hover:bg-amber-100/50 hover:border-amber-400"
+                        }`}
+                      >
+                        <input
+                          id="product-images-input"
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files.length > 0) {
+                              const selected = Array.from(e.target.files);
+                              setImageFiles(prev => [...prev, ...selected]);
+                            }
+                          }}
+                          className="hidden"
+                        />
+
+                        <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-800 shadow-sm">
+                          <Upload size={22} />
+                        </div>
+
+                        <div>
+                          <p className="text-sm font-bold text-amber-950">
+                            {isDraggingImage ? "Drop Product Images Here" : "Drag & Drop Product Images here"}
+                          </p>
+                          <p className="text-xs text-amber-800/70 mt-0.5">
+                            or <span className="text-amber-800 font-bold underline">Click to Browse files</span> from your device
+                          </p>
+                        </div>
+
+                        <span className="text-[10px] font-semibold text-amber-900/50 bg-white border border-amber-200 px-3 py-1 rounded-full shadow-2xs">
+                          Supports PNG, JPG, WEBP • Drag multiple files at once
+                        </span>
+                      </div>
                       
-                      {/* Image Preview Area */}
+                      {/* Image Preview & Management Grid */}
                       {(productForm.existingImageUrls.length > 0 || imageFiles.length > 0) && (
-                        <div className="flex flex-wrap gap-3 mt-3">
-                          {productForm.existingImageUrls.map((url, i) => (
-                            <div key={`existing-${i}`} className="relative group">
-                              <img src={url} alt={`Preview ${i}`} className="w-16 h-16 object-cover rounded-lg border border-amber-200" />
-                              <button
-                                type="button"
-                                onClick={() => setProductForm({
-                                  ...productForm,
-                                  existingImageUrls: productForm.existingImageUrls.filter((_, idx) => idx !== i)
-                                })}
-                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            </div>
-                          ))}
-                          {imageFiles.map((file, i) => (
-                            <div key={`new-${i}`} className="relative group">
-                              <img src={URL.createObjectURL(file)} alt={`Preview ${i}`} className="w-16 h-16 object-cover rounded-lg border border-amber-200" />
-                              <button
-                                type="button"
-                                onClick={() => setImageFiles(imageFiles.filter((_, idx) => idx !== i))}
-                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            </div>
-                          ))}
+                        <div className="space-y-1.5 mt-4">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-amber-950">
+                              Selected Images ({productForm.existingImageUrls.length + imageFiles.length})
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setProductForm(prev => ({ ...prev, existingImageUrls: [] }));
+                                setImageFiles([]);
+                              }}
+                              className="text-[10px] text-rose-700 font-bold hover:underline cursor-pointer"
+                            >
+                              Clear All Images
+                            </button>
+                          </div>
+
+                          <div className="flex flex-wrap gap-3 p-3 bg-amber-50/40 rounded-xl border border-amber-100">
+                            {productForm.existingImageUrls.map((url, i) => (
+                              <div key={`existing-${i}`} className="relative group w-20 h-20 rounded-xl overflow-hidden border border-amber-200 bg-white shadow-xs">
+                                <img src={url} alt={`Existing ${i}`} className="w-full h-full object-cover" />
+                                <span className="absolute top-1 left-1 bg-amber-900/80 text-white text-[8px] font-bold px-1.5 py-0.5 rounded">
+                                  Saved
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setProductForm({
+                                    ...productForm,
+                                    existingImageUrls: productForm.existingImageUrls.filter((_, idx) => idx !== i)
+                                  })}
+                                  className="absolute top-1 right-1 bg-rose-600 hover:bg-rose-700 text-white rounded-full p-1 shadow-md transition-opacity cursor-pointer"
+                                  title="Remove image"
+                                >
+                                  <Trash2 size={11} />
+                                </button>
+                              </div>
+                            ))}
+
+                            {imageFiles.map((file, i) => (
+                              <div key={`new-${i}`} className="relative group w-20 h-20 rounded-xl overflow-hidden border border-amber-300 bg-white shadow-xs">
+                                <img src={URL.createObjectURL(file)} alt={`New upload ${i}`} className="w-full h-full object-cover" />
+                                <span className="absolute top-1 left-1 bg-emerald-700 text-white text-[8px] font-bold px-1.5 py-0.5 rounded">
+                                  New
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setImageFiles(imageFiles.filter((_, idx) => idx !== i))}
+                                  className="absolute top-1 right-1 bg-rose-600 hover:bg-rose-700 text-white rounded-full p-1 shadow-md transition-opacity cursor-pointer"
+                                  title="Remove image"
+                                >
+                                  <Trash2 size={11} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
