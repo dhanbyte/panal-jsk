@@ -4889,231 +4889,220 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Printable Custom Bill Area (GST Tax Invoice - Strict Single Page Fit) */}
-      {printMode === "a4-bill" && activePrintBill && (
-        <div id="printable-a4-bill-area" style={{margin: 0, padding: 0}}>
-          <div 
-            className="bg-white p-[2mm] leading-tight font-sans text-amber-950 flex flex-col justify-between box-border overflow-hidden shrink-0" 
-            style={{
-              width: `${billPageWidth}mm`,
-              maxWidth: `${billPageWidth}mm`,
-              height: `${billPageHeight}mm`,
-              maxHeight: `${billPageHeight}mm`,
-              margin: 0,
-              fontSize: billFontSize === 'small' ? '6px' : billFontSize === 'large' ? '9px' : billFontSize === 'xlarge' ? '10px' : '7.5px'
-            }}
-          >
-            
-            {/* Brand Header */}
-            <div className="flex justify-between items-start pb-1 border-b-[2px] border-amber-800 shrink-0">
-              <div className="flex items-center space-x-3">
-                {businessLogo ? (
-                  <img src={businessLogo} alt="Logo" className="w-14 h-14 object-contain rounded-md border-2 border-amber-200 p-1 bg-white" />
-                ) : (
-                  <div className="w-14 h-14 border-2 border-amber-600 rounded-md flex items-center justify-center font-serif text-sm font-bold text-amber-700 bg-amber-50">
-                    Logo
+      {/* Printable Custom Bill Area – Smart Compact Layout */}
+      {printMode === "a4-bill" && activePrintBill && (() => {
+        const itemCount = activePrintBill.items?.length || 0;
+        // Auto-compact: hide extras when items > 5 to keep single page
+        const isCompact = itemCount > 5;
+        const baseFontPx = billFontSize === 'small' ? 6 : billFontSize === 'large' ? 9 : billFontSize === 'xlarge' ? 10 : 7.5;
+
+        return (
+          <div id="printable-a4-bill-area" style={{margin: 0, padding: 0}}>
+            <div
+              style={{
+                width: `${billPageWidth}mm`,
+                maxWidth: `${billPageWidth}mm`,
+                minHeight: `${billPageHeight}mm`,
+                margin: 0,
+                padding: '2mm',
+                boxSizing: 'border-box',
+                fontFamily: 'Arial, sans-serif',
+                fontSize: `${baseFontPx}px`,
+                color: '#3d2000',
+                background: 'white',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1.5mm',
+                overflow: 'hidden',
+              }}
+            >
+
+              {/* ── HEADER ── */}
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:'2px solid #92400e', paddingBottom:'1.5mm'}}>
+                <div style={{display:'flex', alignItems:'center', gap:'2mm'}}>
+                  {businessLogo ? (
+                    <img src={businessLogo} alt="Logo" style={{width:'10mm', height:'10mm', objectFit:'contain', borderRadius:'1mm'}} />
+                  ) : (
+                    <div style={{width:'10mm', height:'10mm', border:'1.5px solid #b45309', borderRadius:'1mm', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'5px', fontWeight:'bold', color:'#92400e', background:'#fffbeb'}}>LOGO</div>
+                  )}
+                  <div>
+                    <div style={{fontSize:`${baseFontPx * 1.5}px`, fontWeight:'900', textTransform:'uppercase', letterSpacing:'-0.3px', lineHeight:1.1}}>{businessName || 'JSK ART JEWELLERY'}</div>
+                    <div style={{fontSize:`${baseFontPx * 0.85}px`, color:'#92400e', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.5px', marginTop:'0.5mm'}}>{businessSub}</div>
+                    {businessAddress && <div style={{fontSize:`${baseFontPx * 0.8}px`, color:'#78350f', marginTop:'0.3mm', lineHeight:1.2}}>{businessAddress}</div>}
                   </div>
-                )}
-                <div>
-                  <div className="text-2xl font-black tracking-tight text-amber-950 uppercase">{businessName || "JSK ART JEWELLERY"}</div>
-                  <div className="text-[0.8em] text-amber-700/80 font-bold uppercase tracking-widest mt-0.5">{businessSub || "Wholesalers & Mfrs of Diamond and Gold Jewellery"}</div>
+                </div>
+                {/* Invoice info top-right */}
+                <div style={{textAlign:'right', fontSize:`${baseFontPx * 0.85}px`}}>
+                  <div style={{fontWeight:'900', fontSize:`${baseFontPx * 1.05}px`, color:'#451a03', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:'0.5mm'}}>TAX INVOICE</div>
+                  <div style={{display:'flex', gap:'1mm', justifyContent:'flex-end', alignItems:'center'}}>
+                    <span style={{color:'#92400e'}}>Invoice No:</span>
+                    <span style={{fontWeight:'800', color:'#1c1917'}}>{activePrintBill.billNo}</span>
+                  </div>
+                  <div style={{display:'flex', gap:'1mm', justifyContent:'flex-end', alignItems:'center', marginTop:'0.5mm'}}>
+                    <span style={{color:'#92400e'}}>Date:</span>
+                    {/* DATE HIGHLIGHTED */}
+                    <span style={{fontWeight:'900', color:'#92400e', background:'#fef3c7', padding:'0 1mm', borderRadius:'0.8mm', border:'0.5px solid #f59e0b'}}>
+                      {activePrintBill.createdAt?.seconds
+                        ? new Date(activePrintBill.createdAt.seconds * 1000).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })
+                        : new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}
+                    </span>
+                  </div>
+                  {businessGstin && <div style={{marginTop:'0.5mm', color:'#78350f'}}><span style={{fontWeight:'700'}}>GSTIN:</span> {businessGstin}</div>}
                 </div>
               </div>
-            </div>
 
-
-
-            {/* Details block */}
-            <div className="grid grid-cols-2 gap-2 pb-1.5 border-b border-amber-100 text-[0.8em] mt-1 shrink-0">
-              <div>
-                <div className="font-bold text-amber-800 mb-1 uppercase tracking-wider text-[0.8em]">SUPPLIER</div>
-                <div className="font-black text-[1.1em] text-amber-950 leading-tight">{businessName}</div>
-                <div className="text-amber-900/80 whitespace-pre-line leading-snug mt-0.5">{businessAddress}</div>
-                <div className="mt-1.5"><span className="font-bold text-amber-950">GSTIN:</span> <span className="font-medium">{businessGstin}</span></div>
-                <div className="mt-0.5"><span className="font-bold text-amber-950">Email:</span> <span className="font-medium">{businessEmail}</span></div>
-                {businessInstagram && <div className="mt-0.5"><span className="font-bold text-amber-950">Instagram:</span> <span className="font-medium">{businessInstagram}</span></div>}
+              {/* ── CUSTOMER ROW ── */}
+              <div style={{display:'flex', justifyContent:'space-between', fontSize:`${baseFontPx * 0.9}px`, padding:'1mm 0', borderBottom:'0.5px solid #fde68a'}}>
+                <div>
+                  <span style={{color:'#92400e'}}>Bill To: </span>
+                  <span style={{fontWeight:'900', fontSize:`${baseFontPx * 1.05}px`, color:'#1c1917'}}>{activePrintBill.customerName}</span>
+                  {billShowMobile && activePrintBill.customerPhone && activePrintBill.customerPhone !== 'N/A' && (
+                    <span style={{marginLeft:'2mm', color:'#78350f'}}>📞 {activePrintBill.customerPhone}</span>
+                  )}
+                </div>
+                <div style={{textAlign:'right'}}>
+                  <span style={{color:'#92400e'}}>Payment: </span>
+                  <span style={{fontWeight:'700', color:'#1c1917'}}>{activePrintBill.paymentMethod || 'Cash'}</span>
+                  {billShowPlaceOfSupply && <div style={{color:'#78350f'}}>State: Tamil Nadu (33)</div>}
+                </div>
               </div>
-              <div>
-                <div className="font-bold text-amber-800 mb-1 uppercase tracking-wider text-[0.8em]">INVOICE METADATA</div>
-                <table className="w-full text-left mt-0.5">
+
+              {/* ── ITEMS TABLE ── */}
+              <div style={{flex: isCompact ? 'none' : '0 0 auto'}}>
+                <table style={{width:'100%', borderCollapse:'collapse', fontSize:`${baseFontPx * 0.95}px`}}>
+                  <thead>
+                    <tr style={{background:'#451a03', color:'white'}}>
+                      <th style={{padding:'1.2mm 1mm', width:'5mm', textAlign:'center', borderRadius:'1mm 0 0 1mm'}}>#</th>
+                      <th style={{padding:'1.2mm 1mm', textAlign:'left'}}>Item Description</th>
+                      <th style={{padding:'1.2mm 1mm', width:'10mm', textAlign:'center'}}>Size</th>
+                      {/* PRICE HIGHLIGHTED */}
+                      <th style={{padding:'1.2mm 1mm', width:'14mm', textAlign:'right', background:'#7c2d12', color:'#fef3c7'}}>Rate</th>
+                      <th style={{padding:'1.2mm 1mm', width:'6mm', textAlign:'center'}}>Qty</th>
+                      <th style={{padding:'1.2mm 1mm', width:'16mm', textAlign:'right', borderRadius:'0 1mm 1mm 0'}}>Amount</th>
+                    </tr>
+                  </thead>
                   <tbody>
-                    <tr>
-                      <td className="font-bold py-0.5 text-amber-950 w-28">Invoice No:</td>
-                      <td className="text-amber-900 font-medium py-0.5">{activePrintBill.billNo}</td>
-                    </tr>
-                    <tr>
-                      <td className="font-bold py-0.5 text-amber-950">Date:</td>
-                      <td className="text-amber-900 font-medium py-0.5">
-                        {activePrintBill.createdAt?.seconds
-                          ? new Date(activePrintBill.createdAt.seconds * 1000).toLocaleDateString("en-IN", { day: '2-digit', month: 'short', year: 'numeric' })
-                          : new Date().toLocaleDateString("en-IN", { day: '2-digit', month: 'short', year: 'numeric' })}
-                      </td>
-                    </tr>
-                    {billShowPlaceOfSupply && (
-                      <tr>
-                        <td className="font-bold py-0.5 text-amber-950">Place of Supply:</td>
-                        <td className="text-amber-900 font-medium py-0.5">Tamil Nadu (33)</td>
+                    {activePrintBill.items?.map((item: any, idx: number) => (
+                      <tr key={idx} style={{borderBottom:'0.5px solid #fde68a', background: idx % 2 === 0 ? '#fff' : '#fffbeb'}}>
+                        <td style={{padding:'1mm', textAlign:'center', color:'#92400e', fontWeight:'700'}}>{idx + 1}</td>
+                        <td style={{padding:'1mm', fontWeight:'700', color:'#1c1917'}}>{item.name}</td>
+                        <td style={{padding:'1mm', textAlign:'center', color:'#78350f'}}>{item.size || '—'}</td>
+                        {/* PRICE CELL HIGHLIGHTED */}
+                        <td style={{padding:'1mm', textAlign:'right', fontWeight:'800', color:'#92400e', background:'#fef9ee'}}>
+                          ₹{Number(item.price).toLocaleString('en-IN', {minimumFractionDigits:2})}
+                        </td>
+                        <td style={{padding:'1mm', textAlign:'center', fontWeight:'800', color:'#1c1917'}}>{item.quantity}</td>
+                        <td style={{padding:'1mm', textAlign:'right', fontWeight:'800', color:'#1c1917'}}>
+                          ₹{(Number(item.price) * Number(item.quantity)).toLocaleString('en-IN', {minimumFractionDigits:2})}
+                        </td>
                       </tr>
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>
-            </div>
 
-            {/* Buyer Details */}
-            <div className="py-1 border-b border-amber-100 text-[0.8em] shrink-0">
-              <div className="font-bold text-amber-800 mb-0.5 uppercase tracking-wider text-[0.8em]">BUYER (CUSTOMER)</div>
-              <div className="grid grid-cols-2 gap-1">
-                <div>
-                  <div className="flex items-baseline gap-1 mb-0.5"><span className="text-amber-900">Name:</span> <span className="font-bold text-[1.1em] text-amber-950">{activePrintBill.customerName}</span></div>
-                  {billShowMobile && activePrintBill.customerPhone && activePrintBill.customerPhone !== 'N/A' && (
-                    <div className="flex items-baseline gap-1 mb-0.5"><span className="text-amber-900">Mobile:</span> <span className="font-semibold text-amber-950">{activePrintBill.customerPhone}</span></div>
+              {/* ── TOTALS ── */}
+              <div style={{borderTop:'1.5px solid #451a03', paddingTop:'1mm', marginTop:'0.5mm', display:'flex', justifyContent:'flex-end'}}>
+                <div style={{width:'55%', fontSize:`${baseFontPx * 0.9}px`}}>
+                  <div style={{display:'flex', justifyContent:'space-between', padding:'0.3mm 0', color:'#78350f'}}>
+                    <span>Subtotal:</span>
+                    <span style={{fontWeight:'700'}}>₹{Number(activePrintBill.subtotal).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                  </div>
+                  {Number(activePrintBill.discount) > 0 && (
+                    <div style={{display:'flex', justifyContent:'space-between', padding:'0.3mm 0', color:'#15803d'}}>
+                      <span>Discount:</span>
+                      <span style={{fontWeight:'700'}}>-₹{Number(activePrintBill.discount).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                    </div>
                   )}
-                </div>
-                <div>
-                  <div className="flex items-baseline gap-2 mb-0.5"><span className="text-amber-900">Payment:</span> <span className="font-semibold text-amber-950">{activePrintBill.paymentMethod || 'Cash'}</span></div>
-                  {billShowPlaceOfSupply && (
-                    <div className="flex items-baseline gap-2 mb-0.5"><span className="text-amber-900">State:</span> <span className="font-semibold text-amber-950">Tamil Nadu, Code: 33</span></div>
+                  {billShowGst && Number(activePrintBill.cgst) > 0 && (
+                    <div style={{display:'flex', justifyContent:'space-between', padding:'0.3mm 0', color:'#78350f'}}>
+                      <span>CGST:</span>
+                      <span style={{fontWeight:'700'}}>₹{Number(activePrintBill.cgst).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                    </div>
                   )}
-                </div>
-              </div>
-            </div>
-
-            {/* Items Grid */}
-            <div className="flex-grow flex flex-col min-h-0">
-              <table className="w-full text-left text-[0.9em] mt-1 mb-1 border-collapse">
-                <thead>
-                  <tr className="bg-amber-950 text-white font-bold">
-                    <th className="p-1.5 rounded-l-md w-6 text-center">Sl</th>
-                    <th className="p-1.5">Description</th>
-                    <th className="p-1.5 text-center w-14">Size/Wt</th>
-                    <th className="p-1.5 text-right w-16">Price</th>
-                    <th className="p-1.5 text-center w-8">Qty</th>
-                    <th className="p-1.5 text-right rounded-r-md w-20">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activePrintBill.items?.map((item: any, idx: number) => (
-                    <tr key={idx} className="border-b border-amber-200/50">
-                      <td className="p-1.5 text-center font-semibold text-amber-900">{idx + 1}</td>
-                      <td className="p-1.5 font-bold text-amber-950">{item.name}</td>
-                      <td className="p-1.5 text-center text-amber-900">{item.size || '—'}</td>
-                      <td className="p-1.5 text-right font-medium text-amber-900">₹{Number(item.price).toLocaleString('en-IN', {minimumFractionDigits:2})}</td>
-                      <td className="p-1.5 text-center font-bold text-amber-950">{item.quantity}</td>
-                      <td className="p-1.5 text-right font-bold text-amber-950">₹{(Number(item.price) * Number(item.quantity)).toLocaleString('en-IN', {minimumFractionDigits:2})}</td>
-                    </tr>
-                  ))}
-                  {/* Empty rows removed to prevent overflow */}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Taxation calculation */}
-            <div className="flex flex-col gap-2 text-[0.9em] mt-1 pt-1 border-t-2 border-amber-950 shrink-0">
-              <div className="text-right space-y-1 text-amber-900 ml-auto w-[80%]">
-                <div className="flex justify-between gap-1">
-                  <span>Subtotal:</span>
-                  <span className="font-bold text-amber-950">₹{Number(activePrintBill.subtotal).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
-                </div>
-                {Number(activePrintBill.discount) > 0 && (
-                  <div className="flex justify-between gap-1 text-emerald-700">
-                    <span>Discount:</span>
-                    <span className="font-bold">-₹{Number(activePrintBill.discount).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                  {billShowGst && Number(activePrintBill.sgst) > 0 && (
+                    <div style={{display:'flex', justifyContent:'space-between', padding:'0.3mm 0', color:'#78350f'}}>
+                      <span>SGST:</span>
+                      <span style={{fontWeight:'700'}}>₹{Number(activePrintBill.sgst).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                    </div>
+                  )}
+                  {/* GRAND TOTAL – BIG HIGHLIGHT */}
+                  <div style={{display:'flex', justifyContent:'space-between', padding:'1.5mm 2mm', marginTop:'1mm', background:'#451a03', color:'white', borderRadius:'1mm', fontWeight:'900', fontSize:`${baseFontPx * 1.2}px`}}>
+                    <span>GRAND TOTAL</span>
+                    <span>₹{Number(activePrintBill.total).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
                   </div>
-                )}
-                {billShowGst && Number(activePrintBill.cgst) > 0 && (
-                  <div className="flex justify-between gap-1">
-                    <span>CGST @ {activePrintBill.cgstRate || '1.5'}%:</span>
-                    <span className="font-bold text-amber-950">₹{Number(activePrintBill.cgst).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                  <div style={{display:'flex', justifyContent:'space-between', padding:'0.3mm 0', color:'#15803d', fontWeight:'700', marginTop:'0.5mm'}}>
+                    <span>Amount Paid:</span>
+                    <span>₹{Number(activePrintBill.amountPaid).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
                   </div>
-                )}
-                {billShowGst && Number(activePrintBill.sgst) > 0 && (
-                  <div className="flex justify-between gap-1">
-                    <span>SGST @ {activePrintBill.sgstRate || '1.5'}%:</span>
-                    <span className="font-bold text-amber-950">₹{Number(activePrintBill.sgst).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
-                  </div>
-                )}
-                <div className="flex justify-between gap-1 border-t border-dashed border-amber-300 pt-1 mt-1 text-[1.1em] font-black text-amber-950">
-                  <span className="uppercase">Grand Total:</span>
-                  <span className="text-[1.2em]">₹{Number(activePrintBill.total).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
-                </div>
-                
-                <div className="flex justify-between gap-1 pt-0.5 font-bold text-amber-800">
-                  <span>Amount Paid:</span>
-                  <span>₹{Number(activePrintBill.amountPaid).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
-                </div>
-                {Number(activePrintBill.amountDue) > 0 && (
-                  <div className="flex justify-between gap-1 pt-0.5 font-black text-rose-700">
-                    <span>Balance Due:</span>
-                    <span>₹{Number(activePrintBill.amountDue).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="w-full">
-                {billShowAmountWords && (
-                  <>
-                    <div className="font-bold text-amber-800">Amount Chargeable (in words):</div>
-                    <div className="italic font-bold text-amber-950 mt-0.5 leading-snug text-[0.9em]">
+                  {Number(activePrintBill.amountDue) > 0 && (
+                    <div style={{display:'flex', justifyContent:'space-between', padding:'0.3mm 0', color:'#be123c', fontWeight:'900'}}>
+                      <span>Balance Due:</span>
+                      <span>₹{Number(activePrintBill.amountDue).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                    </div>
+                  )}
+                  {billShowAmountWords && (
+                    <div style={{marginTop:'0.8mm', fontSize:`${baseFontPx * 0.8}px`, color:'#92400e', fontStyle:'italic', fontWeight:'600'}}>
                       {numberToWords(Number(activePrintBill.total) || 0)}
                     </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Bank Details & remarks */}
-            <div className="flex flex-col gap-1 border-t-2 border-amber-200 pt-1 mt-1 text-[0.8em] leading-relaxed shrink-0">
-              <div className="space-y-1">
-                {showBankDetails && bankName && (
-                  <div className="bg-amber-50/30 p-1.5 rounded border border-amber-100/50">
-                    <div className="font-bold text-amber-900 mb-0.5">Company Bank Details:</div>
-                    <div>Bank: {bankName}</div>
-                    <div>A/c No: {bankAccount}</div>
-                    <div>IFSC: {bankIfsc}</div>
-                  </div>
-                )}
-                {billTermsText && (
-                  <div>
-                    <div className="font-bold text-amber-900 mb-0.5">Terms & Conditions:</div>
-                    <div className="text-amber-900/80 italic whitespace-pre-line leading-tight pr-4">{billTermsText}</div>
-                  </div>
-                )}
-                {billExtraNote && (
-                  <div>
-                    <div className="font-bold text-amber-900 mb-0.5">Remarks:</div>
-                    <div className="text-amber-950/80 whitespace-pre-line leading-tight pr-4">{billExtraNote}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-              
-            {/* Footer Banner */}
-            {billFooterMsg && (
-              <div className="text-center mt-1 mb-2 py-1 bg-amber-950 text-amber-50 text-[0.8em] font-bold tracking-widest uppercase rounded shrink-0">
-                {billFooterMsg}
-              </div>
-            )}
-
-            {/* Footer Signatures */}
-            {billShowSignature && (
-              <div className="flex justify-between items-end pb-1 text-[0.8em] font-semibold text-amber-900/80 shrink-0">
-                <div>
-                  <div className="border-b-2 border-amber-300 w-32 mb-1"></div>
-                  <div className="text-center">Customer's Signature</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-[0.8em] text-amber-900/60 font-bold mb-6 uppercase">for {businessName}</div>
-                  <div className="border-b-2 border-amber-300 w-32 ml-auto mb-1"></div>
-                  <div className="text-center">Authorised Signatory</div>
+                  )}
                 </div>
               </div>
-            )}
 
+              {/* ── FOOTER SECTION (auto-hidden when items > 5) ── */}
+              {!isCompact && (
+                <>
+                  {/* Bank details */}
+                  {showBankDetails && bankName && (
+                    <div style={{borderTop:'0.5px dashed #fde68a', paddingTop:'1mm', marginTop:'0.5mm', fontSize:`${baseFontPx * 0.85}px`}}>
+                      <div style={{fontWeight:'800', color:'#92400e', marginBottom:'0.3mm'}}>Bank Details:</div>
+                      <div style={{color:'#78350f'}}>Bank: {bankName} &nbsp;|&nbsp; A/c: {bankAccount} &nbsp;|&nbsp; IFSC: {bankIfsc}</div>
+                    </div>
+                  )}
+
+                  {/* Terms & Extra Note */}
+                  {(billTermsText || billExtraNote) && (
+                    <div style={{borderTop:'0.5px dashed #fde68a', paddingTop:'1mm', marginTop:'0.5mm', fontSize:`${baseFontPx * 0.8}px`, color:'#78350f'}}>
+                      {billTermsText && <div><span style={{fontWeight:'800'}}>Terms: </span>{billTermsText}</div>}
+                      {billExtraNote && <div style={{marginTop:'0.3mm'}}><span style={{fontWeight:'800'}}>Note: </span>{billExtraNote}</div>}
+                    </div>
+                  )}
+
+                  {/* Footer Banner */}
+                  {billFooterMsg && (
+                    <div style={{textAlign:'center', background:'#451a03', color:'white', padding:'1mm 2mm', borderRadius:'1mm', fontWeight:'900', fontSize:`${baseFontPx * 0.9}px`, letterSpacing:'1px', textTransform:'uppercase', marginTop:'0.5mm'}}>
+                      {billFooterMsg}
+                    </div>
+                  )}
+
+                  {/* Signatures */}
+                  {billShowSignature && (
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', paddingTop:'4mm', fontSize:`${baseFontPx * 0.85}px`, fontWeight:'700', color:'#92400e'}}>
+                      <div style={{textAlign:'center'}}>
+                        <div style={{borderBottom:'1px solid #d97706', width:'28mm', marginBottom:'0.5mm'}}></div>
+                        <div>Customer's Signature</div>
+                      </div>
+                      <div style={{textAlign:'center'}}>
+                        <div style={{fontSize:`${baseFontPx * 0.75}px`, color:'#a16207', marginBottom:'4mm', textTransform:'uppercase'}}>for {businessName}</div>
+                        <div style={{borderBottom:'1px solid #d97706', width:'28mm', marginBottom:'0.5mm'}}></div>
+                        <div>Authorised Signatory</div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* When compact: just show thank you */}
+              {isCompact && billFooterMsg && (
+                <div style={{textAlign:'center', background:'#451a03', color:'white', padding:'0.8mm 2mm', borderRadius:'1mm', fontWeight:'900', fontSize:`${baseFontPx * 0.85}px`, letterSpacing:'1px', textTransform:'uppercase', marginTop:'0.5mm'}}>
+                  {billFooterMsg}
+                </div>
+              )}
+
+            </div>
           </div>
-        </div>
-      )}
-
+        );
+      })()}
 
       {/* Global CSS Stylesheet for printing overrides */}
 
