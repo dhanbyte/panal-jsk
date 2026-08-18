@@ -5073,41 +5073,48 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* ── ITEMS TABLE ── */}
-                <div style={{marginTop:'0.6mm'}}>
-                  <table style={{width:'100%', borderCollapse:'collapse', fontSize:`${baseFontPt * 0.88}pt`, tableLayout:'fixed'}}>
+                <div style={{marginTop:'0.8mm'}}>
+                  <table style={{width:'100%', borderCollapse:'collapse', fontSize:`${baseFontPt * 0.95}pt`, tableLayout:'fixed'}}>
                     <colgroup>
                       <col style={{width:'4.5mm'}} />
                       <col />
-                      <col style={{width:'10mm'}} />
-                      <col style={{width:'16mm'}} />
-                      <col style={{width:'5.5mm'}} />
-                      <col style={{width:'19mm'}} />
+                      <col style={{width:'11mm'}} />
+                      <col style={{width:'17mm'}} />
+                      <col style={{width:'6mm'}} />
+                      <col style={{width:'20mm'}} />
                     </colgroup>
                     <thead>
                       <tr style={{background:'#451a03', color:'white'}}>
-                        <th style={{padding:'1mm 0.5mm', textAlign:'center', borderRadius:'0.8mm 0 0 0.8mm', fontSize:`${baseFontPt * 0.82}pt`}}>#</th>
-                        <th style={{padding:'1mm 1mm', textAlign:'left', fontSize:`${baseFontPt * 0.85}pt`}}>Item Description</th>
-                        <th style={{padding:'1mm 0.5mm', textAlign:'center', fontSize:`${baseFontPt * 0.85}pt`}}>Size</th>
-                        <th style={{padding:'1mm 1mm', textAlign:'right', background:'#7c2d12', color:'#fef3c7', fontSize:`${baseFontPt * 0.85}pt`}}>Rate</th>
-                        <th style={{padding:'1mm 0.5mm', textAlign:'center', fontSize:`${baseFontPt * 0.82}pt`}}>Qty</th>
-                        <th style={{padding:'1mm 2mm 1mm 1mm', textAlign:'right', borderRadius:'0 0.8mm 0.8mm 0', fontSize:`${baseFontPt * 0.85}pt`}}>Amount</th>
+                        <th style={{padding:'1.2mm 0.5mm', textAlign:'center', borderRadius:'0.8mm 0 0 0.8mm', fontSize:`${baseFontPt * 0.88}pt`, fontWeight:'900'}}>#</th>
+                        <th style={{padding:'1.2mm 1mm', textAlign:'left', fontSize:`${baseFontPt * 0.92}pt`, fontWeight:'900'}}>Item Description</th>
+                        <th style={{padding:'1.2mm 0.5mm', textAlign:'center', fontSize:`${baseFontPt * 0.92}pt`, fontWeight:'900'}}>Size</th>
+                        <th style={{padding:'1.2mm 1mm', textAlign:'right', background:'#7c2d12', color:'#fef3c7', fontSize:`${baseFontPt * 0.92}pt`, fontWeight:'900'}}>Rate</th>
+                        <th style={{padding:'1.2mm 0.5mm', textAlign:'center', fontSize:`${baseFontPt * 0.88}pt`, fontWeight:'900'}}>Qty</th>
+                        <th style={{padding:'1.2mm 2mm 1.2mm 1mm', textAlign:'right', borderRadius:'0 0.8mm 0.8mm 0', fontSize:`${baseFontPt * 0.92}pt`, fontWeight:'900'}}>Amount</th>
                       </tr>
                     </thead>
                     <tbody>
                       {activePrintBill.items?.map((item: any, idx: number) => (
-                        <tr key={idx} style={{borderBottom:'0.5px solid #fde68a', background: idx % 2 === 0 ? '#fff' : '#fffbeb'}}>
-                          <td style={{padding:'1.2mm 0.5mm', textAlign:'center', color:'#92400e', fontWeight:'700'}}>{idx + 1}</td>
-                          <td style={{padding:'1.2mm 1mm', fontWeight:'800', fontSize:`${baseFontPt * 0.95}pt`, color:'#1c1917', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                        <tr key={idx} style={{borderBottom:'0.8px solid #fde68a', background: idx % 2 === 0 ? '#ffffff' : '#fffdf5'}}>
+                          <td style={{padding:'1.5mm 0.5mm', textAlign:'center', color:'#92400e', fontWeight:'900', fontSize:`${baseFontPt * 0.9}pt`}}>{idx + 1}</td>
+                          {/* PRODUCT NAME - MUCH BIGGER & EXTRA BOLD */}
+                          <td style={{padding:'1.5mm 1mm', fontWeight:'900', fontSize:`${baseFontPt * 1.12}pt`, color:'#000000', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', letterSpacing:'-0.1px'}}>
                             {item.name}
                           </td>
-                          <td style={{padding:'1.2mm 0.5mm', textAlign:'center', fontWeight:'800', fontSize:`${baseFontPt * 0.9}pt`, color:'#451a03'}}>
-                            {item.size || '—'}
+                          {/* PRODUCT SIZE - BOLD & CLEAR */}
+                          <td style={{padding:'1.5mm 0.5mm', textAlign:'center'}}>
+                            <span style={{fontWeight:'900', fontSize:`${baseFontPt * 1.05}pt`, color:'#451a03', background:'#fef3c7', border:'0.5px solid #f59e0b', padding:'0.3mm 1mm', borderRadius:'0.6mm', display:'inline-block', whiteSpace:'nowrap'}}>
+                              {item.size || '—'}
+                            </span>
                           </td>
-                          <td style={{padding:'1.2mm 1mm', textAlign:'right', fontWeight:'800', fontSize:`${baseFontPt * 0.9}pt`, color:'#92400e', background:'#fef9ee', whiteSpace:'nowrap'}}>
+                          {/* RATE */}
+                          <td style={{padding:'1.5mm 1mm', textAlign:'right', fontWeight:'900', fontSize:`${baseFontPt * 1.02}pt`, color:'#7c2d12', background:'#fef9ee', whiteSpace:'nowrap'}}>
                             ₹{Number(item.price).toLocaleString('en-IN', {minimumFractionDigits:2})}
                           </td>
-                          <td style={{padding:'1.2mm 0.5mm', textAlign:'center', fontWeight:'800', fontSize:`${baseFontPt * 0.9}pt`, color:'#1c1917'}}>{item.quantity}</td>
-                          <td style={{padding:'1.2mm 2mm 1.2mm 1mm', textAlign:'right', fontWeight:'900', fontSize:`${baseFontPt * 0.95}pt`, color:'#1c1917', whiteSpace:'nowrap'}}>
+                          {/* QTY */}
+                          <td style={{padding:'1.5mm 0.5mm', textAlign:'center', fontWeight:'900', fontSize:`${baseFontPt * 1.08}pt`, color:'#000000'}}>{item.quantity}</td>
+                          {/* AMOUNT */}
+                          <td style={{padding:'1.5mm 2mm 1.5mm 1mm', textAlign:'right', fontWeight:'900', fontSize:`${baseFontPt * 1.12}pt`, color:'#000000', whiteSpace:'nowrap'}}>
                             ₹{(Number(item.price) * Number(item.quantity)).toLocaleString('en-IN', {minimumFractionDigits:2})}
                           </td>
                         </tr>
