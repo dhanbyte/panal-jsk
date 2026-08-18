@@ -442,8 +442,8 @@ export default function AdminDashboard() {
           const idata = doc.data();
           if (idata.businessName) setBusinessName(idata.businessName);
           if (idata.businessSub) setBusinessSub(idata.businessSub);
-          if (idata.businessAddress) setBusinessAddress(idata.businessAddress);
-          if (idata.businessPhone) setBusinessPhone(idata.businessPhone);
+          setBusinessAddress(idata.businessAddress || "No. 123, 2nd Floor, Sowcarpet, CHENNAI - 600079");
+          setBusinessPhone(idata.businessPhone || "8949075688");
           if (idata.businessGstin) setBusinessGstin(idata.businessGstin);
           if (idata.businessEmail) setBusinessEmail(idata.businessEmail);
           if (idata.bankName) setBankName(idata.bankName);
@@ -1049,6 +1049,9 @@ export default function AdminDashboard() {
           cgst,
           sgst,
           igst,
+          cgstRate: Number(billCgst) || 1.5,
+          sgstRate: Number(billSgst) || 1.5,
+          igstRate: Number(billIgst) || 0,
           total,
           amountPaid: totalPaid,
           amountDue: due,
@@ -1339,6 +1342,9 @@ export default function AdminDashboard() {
           cgst,
           sgst,
           igst,
+          cgstRate: Number(billCgst) || 1.5,
+          sgstRate: Number(billSgst) || 1.5,
+          igstRate: Number(billIgst) || 0,
           total,
           totalCost,
           paymentStatus,
@@ -4924,6 +4930,29 @@ export default function AdminDashboard() {
         // 2x font: small=8, medium=10, large=12, xlarge=14
         const baseFontPx = billFontSize === 'small' ? 8 : billFontSize === 'large' ? 12 : billFontSize === 'xlarge' ? 14 : 10;
 
+        // Robust GST calculations & rates
+        const subtotalVal = Number(activePrintBill.subtotal) || 0;
+        const discountVal = Number(activePrintBill.discount) || 0;
+        const taxableVal = Math.max(0, subtotalVal - discountVal);
+        
+        const cgstRateVal = activePrintBill.cgstRate !== undefined ? Number(activePrintBill.cgstRate) : (Number(billCgst) || 1.5);
+        const sgstRateVal = activePrintBill.sgstRate !== undefined ? Number(activePrintBill.sgstRate) : (Number(billSgst) || 1.5);
+        const igstRateVal = activePrintBill.igstRate !== undefined ? Number(activePrintBill.igstRate) : (Number(billIgst) || 0);
+
+        const cgstVal = activePrintBill.cgst !== undefined && Number(activePrintBill.cgst) > 0 
+          ? Number(activePrintBill.cgst) 
+          : (cgstRateVal > 0 ? Number((taxableVal * (cgstRateVal / 100)).toFixed(2)) : 0);
+
+        const sgstVal = activePrintBill.sgst !== undefined && Number(activePrintBill.sgst) > 0 
+          ? Number(activePrintBill.sgst) 
+          : (sgstRateVal > 0 ? Number((taxableVal * (sgstRateVal / 100)).toFixed(2)) : 0);
+
+        const igstVal = activePrintBill.igst !== undefined && Number(activePrintBill.igst) > 0 
+          ? Number(activePrintBill.igst) 
+          : (igstRateVal > 0 ? Number((taxableVal * (igstRateVal / 100)).toFixed(2)) : 0);
+
+        const totalCalculated = Number(activePrintBill.total) || Number((taxableVal + cgstVal + sgstVal + igstVal).toFixed(2));
+
         return (
           <div id="printable-a4-bill-area" style={{margin: 0, padding: 0}}>
             <div
@@ -4956,8 +4985,8 @@ export default function AdminDashboard() {
                   )}
                   <div style={{minWidth: 0}}>
                     <div style={{fontSize:`${baseFontPx * 1.5}px`, fontWeight:'900', textTransform:'uppercase', letterSpacing:'-0.3px', lineHeight:1.1}}>{businessName || 'JSK ART JEWELLERY'}</div>
-                    <div style={{fontSize:`${baseFontPx * 0.85}px`, color:'#92400e', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.5px', marginTop:'0.4mm'}}>{businessSub}</div>
-                    {businessAddress && <div style={{fontSize:`${baseFontPx * 0.82}px`, color:'#78350f', marginTop:'0.3mm', lineHeight:1.25, fontWeight:'600'}}>{businessAddress}</div>}
+                    <div style={{fontSize:`${baseFontPx * 0.85}px`, color:'#92400e', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.5px', marginTop:'0.4mm'}}>{businessSub || "Wholesalers & Mfrs of Diamond and Gold Jewellery"}</div>
+                    <div style={{fontSize:`${baseFontPx * 0.82}px`, color:'#78350f', marginTop:'0.3mm', lineHeight:1.25, fontWeight:'600'}}>{businessAddress || "No. 123, 2nd Floor, Sowcarpet, CHENNAI - 600079"}</div>
                     <div style={{fontSize:`${baseFontPx * 0.8}px`, color:'#92400e', marginTop:'0.3mm', fontWeight:'700'}}>📞 Phone: +91 {businessPhone || "8949075688"}</div>
                   </div>
                 </div>
@@ -4977,7 +5006,7 @@ export default function AdminDashboard() {
                         : new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}
                     </span>
                   </div>
-                  {businessGstin && <div style={{marginTop:'0.5mm', color:'#78350f', whiteSpace:'nowrap'}}><span style={{fontWeight:'700'}}>GSTIN:</span> {businessGstin}</div>}
+                  <div style={{marginTop:'0.5mm', color:'#78350f', whiteSpace:'nowrap'}}><span style={{fontWeight:'700'}}>GSTIN:</span> {businessGstin || "33AAEFJ2110L1ZS"}</div>
                 </div>
               </div>
 
@@ -5041,37 +5070,43 @@ export default function AdminDashboard() {
 
               {/* ── TOTALS – full width right-aligned with safety padding ── */}
               <div style={{borderTop:'1.5px solid #451a03', paddingTop:'1mm', marginTop:'0.5mm'}}>
-                <div style={{marginLeft:'auto', width:'62%', fontSize:`${baseFontPx * 0.9}px`, paddingRight:'1.5mm'}}>
+                <div style={{marginLeft:'auto', width:'65%', fontSize:`${baseFontPx * 0.9}px`, paddingRight:'1.5mm'}}>
                   <div style={{display:'flex', justifyContent:'space-between', padding:'0.4mm 0', color:'#78350f'}}>
-                    <span>Subtotal:</span>
-                    <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>₹{Number(activePrintBill.subtotal).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                    <span>Subtotal (Taxable):</span>
+                    <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>₹{subtotalVal.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
                   </div>
-                  {Number(activePrintBill.discount) > 0 && (
+                  {discountVal > 0 && (
                     <div style={{display:'flex', justifyContent:'space-between', padding:'0.4mm 0', color:'#15803d'}}>
                       <span>Discount:</span>
-                      <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>-₹{Number(activePrintBill.discount).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                      <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>-₹{discountVal.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
                     </div>
                   )}
-                  {billShowGst && Number(activePrintBill.cgst) > 0 && (
+                  {cgstVal > 0 && (
                     <div style={{display:'flex', justifyContent:'space-between', padding:'0.4mm 0', color:'#78350f'}}>
-                      <span>CGST:</span>
-                      <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>₹{Number(activePrintBill.cgst).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                      <span>CGST ({cgstRateVal}%):</span>
+                      <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>₹{cgstVal.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
                     </div>
                   )}
-                  {billShowGst && Number(activePrintBill.sgst) > 0 && (
+                  {sgstVal > 0 && (
                     <div style={{display:'flex', justifyContent:'space-between', padding:'0.4mm 0', color:'#78350f'}}>
-                      <span>SGST:</span>
-                      <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>₹{Number(activePrintBill.sgst).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                      <span>SGST ({sgstRateVal}%):</span>
+                      <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>₹{sgstVal.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                    </div>
+                  )}
+                  {igstVal > 0 && (
+                    <div style={{display:'flex', justifyContent:'space-between', padding:'0.4mm 0', color:'#78350f'}}>
+                      <span>IGST ({igstRateVal}%):</span>
+                      <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>₹{igstVal.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
                     </div>
                   )}
                   {/* GRAND TOTAL – BIG HIGHLIGHT */}
                   <div style={{display:'flex', justifyContent:'space-between', padding:'1.5mm 2.5mm', marginTop:'0.8mm', background:'#451a03', color:'white', borderRadius:'1mm', fontWeight:'900', fontSize:`${baseFontPx * 1.15}px`, whiteSpace:'nowrap', boxSizing:'border-box'}}>
                     <span>GRAND TOTAL</span>
-                    <span>₹{Number(activePrintBill.total).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                    <span>₹{totalCalculated.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
                   </div>
                   <div style={{display:'flex', justifyContent:'space-between', padding:'0.4mm 0', color:'#15803d', fontWeight:'700', marginTop:'0.3mm'}}>
                     <span>Amount Paid:</span>
-                    <span style={{whiteSpace:'nowrap'}}>₹{Number(activePrintBill.amountPaid).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                    <span style={{whiteSpace:'nowrap'}}>₹{Number(activePrintBill.amountPaid || totalCalculated).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
                   </div>
                   {Number(activePrintBill.amountDue) > 0 && (
                     <div style={{display:'flex', justifyContent:'space-between', padding:'0.4mm 0', color:'#be123c', fontWeight:'900'}}>
