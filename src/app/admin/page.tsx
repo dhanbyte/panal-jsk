@@ -192,6 +192,8 @@ export default function AdminDashboard() {
 
   // Bill Customization States
   const [billFontSize, setBillFontSize] = useState<"small"|"medium"|"large"|"xlarge">("medium");
+  const [billPageWidth, setBillPageWidth] = useState<number>(100);
+  const [billPageHeight, setBillPageHeight] = useState<number>(140);
   const [billFooterMsg, setBillFooterMsg] = useState("Thank You for Shopping With Us!");
   const [billTermsText, setBillTermsText] = useState("Goods once sold will not be returned or exchanged.");
   const [billShowGst, setBillShowGst] = useState(true);
@@ -452,6 +454,8 @@ export default function AdminDashboard() {
           if (idata.whatsappChannelUrl !== undefined) setWhatsappChannelUrl(idata.whatsappChannelUrl);
           // Bill Customization
           if (idata.billFontSize) setBillFontSize(idata.billFontSize);
+          if (idata.billPageWidth) setBillPageWidth(Number(idata.billPageWidth));
+          if (idata.billPageHeight) setBillPageHeight(Number(idata.billPageHeight));
           if (idata.billFooterMsg !== undefined) setBillFooterMsg(idata.billFooterMsg);
           if (idata.billTermsText !== undefined) setBillTermsText(idata.billTermsText);
           if (idata.billShowGst !== undefined) setBillShowGst(idata.billShowGst);
@@ -1060,7 +1064,7 @@ export default function AdminDashboard() {
             setTimeout(() => {
               document.body.classList.remove("print-mode-a4-bill");
             }, 1000);
-          }, 100);
+          }, 350);
         } else {
           setPrintMode("bill");
           document.body.classList.add("print-mode-bill");
@@ -1069,7 +1073,7 @@ export default function AdminDashboard() {
             setTimeout(() => {
               document.body.classList.remove("print-mode-bill");
             }, 1000);
-          }, 100);
+          }, 350);
         }
       }
 
@@ -1545,6 +1549,8 @@ export default function AdminDashboard() {
         whatsappChannelUrl,
         // Bill Customization
         billFontSize,
+        billPageWidth,
+        billPageHeight,
         billFooterMsg,
         billTermsText,
         billShowGst,
@@ -3323,7 +3329,7 @@ export default function AdminDashboard() {
                               {/* Items / Profit Details */}
                               <td className="p-3">
                                 <div className="space-y-1 max-w-xs overflow-hidden text-ellipsis whitespace-normal">
-                                  {tx.items.map((item: any, idx: number) => {
+                                  {tx.items?.map((item: any, idx: number) => {
                                     const profitAmount = tx.type === "Sale" ? (item.price - (item.purchasePrice || 0)) * item.quantity : 0;
                                     return (
                                       <div key={idx} className="text-[10px] text-amber-900 leading-tight">
@@ -3349,20 +3355,35 @@ export default function AdminDashboard() {
                                     Add Payment
                                   </button>
                                 )}
-                                {tx.type === "Sale" && tx.pdfUrl && (
-                                  <div className="inline-flex flex-wrap gap-1.5 items-center">
-                                    <a
-                                      href={tx.pdfUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center space-x-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1.5 rounded transition-all cursor-pointer"
-                                    >
-                                      <FileText size={10} />
-                                      <span>View PDF</span>
-                                    </a>
+                                {tx.type === "Sale" && (
+                                  <div className="inline-flex flex-wrap gap-1.5 items-center justify-end">
+                                    {tx.pdfUrl && (
+                                      <a
+                                        href={tx.pdfUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center space-x-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1.5 rounded transition-all cursor-pointer"
+                                      >
+                                        <FileText size={10} />
+                                        <span>View PDF</span>
+                                      </a>
+                                    )}
                                     <button
                                       onClick={() => {
-                                        setActivePrintBill(tx);
+                                        setActivePrintBill({
+                                          ...tx,
+                                          billNo: tx.billNo || tx.id || "INV-OLD",
+                                          subtotal: tx.subtotal ?? (tx.items ? tx.items.reduce((acc: number, it: any) => acc + (Number(it.price || 0) * Number(it.quantity || 1)), 0) : (tx.totalAmount || tx.total || 0)),
+                                          total: tx.total ?? tx.totalAmount ?? 0,
+                                          cgst: tx.cgst ?? 0,
+                                          sgst: tx.sgst ?? 0,
+                                          igst: tx.igst ?? 0,
+                                          discount: tx.discount ?? 0,
+                                          amountPaid: tx.amountPaid ?? tx.totalAmount ?? tx.total ?? 0,
+                                          amountDue: tx.amountDue ?? 0,
+                                          customerName: tx.customerName || "Customer",
+                                          customerPhone: tx.customerPhone || "N/A"
+                                        });
                                         setPrintMode("a4-bill");
                                         document.body.classList.add("print-mode-a4-bill");
                                         setTimeout(() => {
@@ -3370,16 +3391,29 @@ export default function AdminDashboard() {
                                           setTimeout(() => {
                                             document.body.classList.remove("print-mode-a4-bill");
                                           }, 1000);
-                                        }, 100);
+                                        }, 350);
                                       }}
                                       className="inline-flex items-center space-x-1 text-[10px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1.5 rounded transition-all cursor-pointer"
                                     >
                                       <Printer size={10} />
-                                      <span>Print A6</span>
+                                      <span>Print 10x14cm</span>
                                     </button>
                                     <button
                                       onClick={() => {
-                                        setActivePrintBill(tx);
+                                        setActivePrintBill({
+                                          ...tx,
+                                          billNo: tx.billNo || tx.id || "INV-OLD",
+                                          subtotal: tx.subtotal ?? (tx.items ? tx.items.reduce((acc: number, it: any) => acc + (Number(it.price || 0) * Number(it.quantity || 1)), 0) : (tx.totalAmount || tx.total || 0)),
+                                          total: tx.total ?? tx.totalAmount ?? 0,
+                                          cgst: tx.cgst ?? 0,
+                                          sgst: tx.sgst ?? 0,
+                                          igst: tx.igst ?? 0,
+                                          discount: tx.discount ?? 0,
+                                          amountPaid: tx.amountPaid ?? tx.totalAmount ?? tx.total ?? 0,
+                                          amountDue: tx.amountDue ?? 0,
+                                          customerName: tx.customerName || "Customer",
+                                          customerPhone: tx.customerPhone || "N/A"
+                                        });
                                         setPrintMode("bill");
                                         document.body.classList.add("print-mode-bill");
                                         setTimeout(() => {
@@ -3387,7 +3421,7 @@ export default function AdminDashboard() {
                                           setTimeout(() => {
                                             document.body.classList.remove("print-mode-bill");
                                           }, 1000);
-                                        }, 100);
+                                        }, 350);
                                       }}
                                       className="inline-flex items-center space-x-1 text-[10px] font-bold text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 px-2.5 py-1.5 rounded transition-all cursor-pointer"
                                     >
@@ -3395,17 +3429,17 @@ export default function AdminDashboard() {
                                       <span>Print Thermal</span>
                                     </button>
                                   </div>
-                                 )}
-                                 {tx.type === "Sale" && (
-                                   <button
-                                     onClick={() => handleDeleteBill(tx)}
-                                     className="inline-flex items-center space-x-1 text-[10px] font-bold text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1.5 rounded transition-all cursor-pointer mt-1"
-                                   >
-                                     <Trash2 size={10} />
-                                     <span>Delete</span>
-                                   </button>
-                                 )}
-                               </td>
+                                )}
+                                {tx.type === "Sale" && (
+                                  <button
+                                    onClick={() => handleDeleteBill(tx)}
+                                    className="inline-flex items-center space-x-1 text-[10px] font-bold text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1.5 rounded transition-all cursor-pointer mt-1"
+                                  >
+                                    <Trash2 size={10} />
+                                    <span>Delete</span>
+                                  </button>
+                                )}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -3673,6 +3707,78 @@ export default function AdminDashboard() {
                       🧾 Bill / Invoice Customization
                     </h3>
 
+                    {/* Page Dimensions (Width & Height) */}
+                    <div className="bg-amber-50/30 p-4 rounded-xl border border-amber-100/60 space-y-3">
+                      <label className="text-xs font-bold text-amber-900/80 block">📐 Custom Bill Page Size (Width &amp; Height in mm)</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[11px] font-bold text-amber-900/70 block mb-1">Page Width (mm)</label>
+                          <input
+                            type="number"
+                            value={billPageWidth}
+                            onChange={e => setBillPageWidth(Math.max(40, Number(e.target.value)))}
+                            className="w-full border border-amber-200/80 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-bold"
+                            placeholder="100"
+                          />
+                          <span className="text-[10px] text-amber-900/50">100 mm = 10 cm</span>
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-bold text-amber-900/70 block mb-1">Page Height (mm)</label>
+                          <input
+                            type="number"
+                            value={billPageHeight}
+                            onChange={e => setBillPageHeight(Math.max(50, Number(e.target.value)))}
+                            className="w-full border border-amber-200/80 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-bold"
+                            placeholder="140"
+                          />
+                          <span className="text-[10px] text-amber-900/50">140 mm = 14 cm</span>
+                        </div>
+                      </div>
+
+                      {/* Quick Presets */}
+                      <div className="space-y-1.5 pt-1">
+                        <label className="text-[10px] font-bold text-amber-900/60 uppercase tracking-wider block">Quick Presets:</label>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => { setBillPageWidth(100); setBillPageHeight(140); }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                              billPageWidth === 100 && billPageHeight === 140 ? "bg-amber-800 text-white border-amber-800 shadow" : "bg-white text-amber-900 border-amber-200 hover:bg-amber-50"
+                            }`}
+                          >
+                            10 × 14 cm (Current)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setBillPageWidth(105); setBillPageHeight(148); }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                              billPageWidth === 105 && billPageHeight === 148 ? "bg-amber-800 text-white border-amber-800 shadow" : "bg-white text-amber-900 border-amber-200 hover:bg-amber-50"
+                            }`}
+                          >
+                            A6 (10.5 × 14.8 cm)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setBillPageWidth(80); setBillPageHeight(120); }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                              billPageWidth === 80 && billPageHeight === 120 ? "bg-amber-800 text-white border-amber-800 shadow" : "bg-white text-amber-900 border-amber-200 hover:bg-amber-50"
+                            }`}
+                          >
+                            8 × 12 cm
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setBillPageWidth(210); setBillPageHeight(297); }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                              billPageWidth === 210 && billPageHeight === 297 ? "bg-amber-800 text-white border-amber-800 shadow" : "bg-white text-amber-900 border-amber-200 hover:bg-amber-50"
+                            }`}
+                          >
+                            A4 Full Page (21 × 29.7 cm)
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Font Size */}
                     <div className="bg-amber-50/30 p-4 rounded-xl border border-amber-100/60 space-y-3">
                       <label className="text-xs font-bold text-amber-900/80 block">📏 Bill Font Size</label>
@@ -3692,7 +3798,7 @@ export default function AdminDashboard() {
                           </button>
                         ))}
                       </div>
-                      <p className="text-[10px] text-amber-900/50">Font size affects all text in the printed A4 invoice.</p>
+                      <p className="text-[10px] text-amber-900/50">Font size affects all text in the printed invoice.</p>
                     </div>
 
                     {/* Show/Hide Toggles */}
@@ -4767,10 +4873,19 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Printable A4 Bill Area (GST Tax Invoice) */}
+      {/* Printable Custom Bill Area (GST Tax Invoice - Strict Single Page Fit) */}
       {printMode === "a4-bill" && activePrintBill && (
-        <div id="printable-a4-bill-area" style={{display:'none'}} className="bg-white">
-          <div className="w-[105mm] min-h-[148.5mm] h-max overflow-visible bg-[#faf8f5] p-[2mm] leading-tight font-sans text-amber-950 flex flex-col box-border" style={{fontSize: billFontSize === 'small' ? '6px' : billFontSize === 'large' ? '9px' : billFontSize === 'xlarge' ? '10px' : '7.5px'}}>
+        <div id="printable-a4-bill-area" className="bg-white">
+          <div 
+            className="bg-white p-[2mm] leading-tight font-sans text-amber-950 flex flex-col justify-between box-border mx-auto overflow-hidden shrink-0" 
+            style={{
+              width: `${billPageWidth}mm`,
+              maxWidth: `${billPageWidth}mm`,
+              height: `${billPageHeight}mm`,
+              maxHeight: `${billPageHeight}mm`,
+              fontSize: billFontSize === 'small' ? '6px' : billFontSize === 'large' ? '9px' : billFontSize === 'xlarge' ? '10px' : '7.5px'
+            }}
+          >
             
             {/* Brand Header */}
             <div className="flex justify-between items-start pb-1 border-b-[2px] border-amber-800 shrink-0">
@@ -5000,7 +5115,9 @@ export default function AdminDashboard() {
           body.print-mode-barcode #printable-barcode-area {
             display: block !important;
             visibility: visible !important;
-            position: static !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
             width: 80mm !important;
             margin: 0 !important;
             padding: 0 !important;
@@ -5031,14 +5148,22 @@ export default function AdminDashboard() {
             padding: 0 !important;
           }
 
-          /* --- A4 BILL MODE --- */
+          /* --- DYNAMIC CUSTOM BILL MODE (SINGLE PAGE STRICT FIT) --- */
           body.print-mode-a4-bill #printable-a4-bill-area {
             display: block !important;
             visibility: visible !important;
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
-            width: 105mm !important;
+            width: ${billPageWidth}mm !important;
+            max-width: ${billPageWidth}mm !important;
+            height: ${billPageHeight}mm !important;
+            max-height: ${billPageHeight}mm !important;
+            overflow: hidden !important;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
             box-sizing: border-box !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
@@ -5056,12 +5181,16 @@ export default function AdminDashboard() {
             page-break-inside: avoid !important;
             break-inside: avoid !important;
             display: flex !important;
+            justify-content: flex-start !important;
+            align-items: center !important;
             box-sizing: border-box !important;
             width: 80mm !important;
             height: 12mm !important;
             max-height: 12mm !important;
             overflow: hidden !important;
             background: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
 
           /* No page break after the very last label */
@@ -5079,14 +5208,14 @@ export default function AdminDashboard() {
           @page {
             size: ${
               printMode === "a4-bill" 
-                ? "105mm 148mm"
+                ? `${billPageWidth}mm ${billPageHeight}mm`
                 : printMode === "bill"
                 ? "80mm auto"
                 : barcodeLayout === "a4"
                 ? "A4 portrait"
                 : "80mm 12mm landscape"
             };
-            margin: 5mm 0mm 0mm 0mm !important;
+            margin: 0mm !important;
           }
 
           body.print-mode-barcode {
