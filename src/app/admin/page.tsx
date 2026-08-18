@@ -165,7 +165,7 @@ export default function AdminDashboard() {
   // State collections
   const [products, setProducts] = useState<Product[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
-  const [whatsappNumber, setWhatsappNumber] = useState("919999999999");
+  const [whatsappNumber, setWhatsappNumber] = useState("8949075688");
   const [upiId, setUpiId] = useState("");
   const [showUpiQrModal, setShowUpiQrModal] = useState(false);
   const [upiQrAmount, setUpiQrAmount] = useState("0");
@@ -175,6 +175,7 @@ export default function AdminDashboard() {
   const [businessName, setBusinessName] = useState("JSK ART JEWELLERY");
   const [businessSub, setBusinessSub] = useState("Wholesalers & Mfrs of Diamond and Gold Jewellery");
   const [businessAddress, setBusinessAddress] = useState("No. 123, 2nd Floor, Sowcarpet, CHENNAI - 600079");
+  const [businessPhone, setBusinessPhone] = useState("8949075688");
   const [businessGstin, setBusinessGstin] = useState("33AAEFJ2110L1ZS");
   const [businessEmail, setBusinessEmail] = useState("jskjewellers@gmail.com");
   const [bankName, setBankName] = useState("Indian Overseas Bank");
@@ -442,6 +443,7 @@ export default function AdminDashboard() {
           if (idata.businessName) setBusinessName(idata.businessName);
           if (idata.businessSub) setBusinessSub(idata.businessSub);
           if (idata.businessAddress) setBusinessAddress(idata.businessAddress);
+          if (idata.businessPhone) setBusinessPhone(idata.businessPhone);
           if (idata.businessGstin) setBusinessGstin(idata.businessGstin);
           if (idata.businessEmail) setBusinessEmail(idata.businessEmail);
           if (idata.bankName) setBankName(idata.bankName);
@@ -1544,6 +1546,7 @@ export default function AdminDashboard() {
         businessName,
         businessSub,
         businessAddress,
+        businessPhone,
         businessGstin,
         businessEmail,
         bankName,
@@ -3584,6 +3587,19 @@ export default function AdminDashboard() {
                         />
                       </div>
                       <div className="space-y-1">
+                        <label className="text-xs font-bold text-amber-900/70">Customer Care / Contact Number (On Bill)</label>
+                        <input
+                          type="text"
+                          value={businessPhone}
+                          onChange={(e) => {
+                            setBusinessPhone(e.target.value);
+                            setWhatsappNumber(e.target.value);
+                          }}
+                          className="w-full border border-amber-200/80 rounded-xl px-3 py-2 text-sm bg-amber-50/10 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                          placeholder="e.g. 8949075688"
+                        />
+                      </div>
+                      <div className="space-y-1">
                         <label className="text-xs font-bold text-amber-900/70">Instagram Username / Link</label>
                         <input
                           type="text"
@@ -4932,16 +4948,17 @@ export default function AdminDashboard() {
 
               {/* ── HEADER ── */}
               <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:'2px solid #92400e', paddingBottom:'1.5mm'}}>
-                <div style={{display:'flex', alignItems:'center', gap:'2mm', minWidth: 0}}>
+                <div style={{display:'flex', alignItems:'center', gap:'2.5mm', minWidth: 0}}>
                   {businessLogo ? (
-                    <img src={businessLogo} alt="Logo" style={{width:'10mm', height:'10mm', objectFit:'contain', borderRadius:'1mm', flexShrink: 0}} />
+                    <img src={businessLogo} alt="Logo" style={{width:'16mm', height:'16mm', objectFit:'contain', borderRadius:'1.5mm', flexShrink: 0, border:'1px solid #fde68a'}} />
                   ) : (
-                    <div style={{width:'10mm', height:'10mm', border:'1.5px solid #b45309', borderRadius:'1mm', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'5px', fontWeight:'bold', color:'#92400e', background:'#fffbeb', flexShrink: 0}}>LOGO</div>
+                    <div style={{width:'16mm', height:'16mm', border:'1.5px solid #b45309', borderRadius:'1.5mm', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'7px', fontWeight:'bold', color:'#92400e', background:'#fffbeb', flexShrink: 0}}>LOGO</div>
                   )}
                   <div style={{minWidth: 0}}>
                     <div style={{fontSize:`${baseFontPx * 1.5}px`, fontWeight:'900', textTransform:'uppercase', letterSpacing:'-0.3px', lineHeight:1.1}}>{businessName || 'JSK ART JEWELLERY'}</div>
-                    <div style={{fontSize:`${baseFontPx * 0.85}px`, color:'#92400e', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.5px', marginTop:'0.5mm'}}>{businessSub}</div>
-                    {businessAddress && <div style={{fontSize:`${baseFontPx * 0.8}px`, color:'#78350f', marginTop:'0.3mm', lineHeight:1.2}}>{businessAddress}</div>}
+                    <div style={{fontSize:`${baseFontPx * 0.85}px`, color:'#92400e', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.5px', marginTop:'0.4mm'}}>{businessSub}</div>
+                    {businessAddress && <div style={{fontSize:`${baseFontPx * 0.82}px`, color:'#78350f', marginTop:'0.3mm', lineHeight:1.25, fontWeight:'600'}}>{businessAddress}</div>}
+                    <div style={{fontSize:`${baseFontPx * 0.8}px`, color:'#92400e', marginTop:'0.3mm', fontWeight:'700'}}>📞 Phone: +91 {businessPhone || "8949075688"}</div>
                   </div>
                 </div>
                 {/* Invoice info top-right */}
@@ -5062,13 +5079,16 @@ export default function AdminDashboard() {
                       <span style={{whiteSpace:'nowrap'}}>₹{Number(activePrintBill.amountDue).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
                     </div>
                   )}
-                  {billShowAmountWords && (
-                    <div style={{marginTop:'0.8mm', fontSize:`${baseFontPx * 0.75}px`, color:'#92400e', fontStyle:'italic', fontWeight:'600'}}>
-                      {numberToWords(Number(activePrintBill.total) || 0)}
-                    </div>
-                  )}
                 </div>
               </div>
+
+              {/* ── AMOUNT IN WORDS (Clean Dedicated Full-Width Banner) ── */}
+              {billShowAmountWords && (
+                <div style={{marginTop:'0.8mm', padding:'0.8mm 2mm', background:'#fffbeb', borderRadius:'1mm', border:'0.5px solid #fde68a', fontSize:`${baseFontPx * 0.82}px`, color:'#451a03', lineHeight:1.25}}>
+                  <span style={{fontWeight:'900', color:'#92400e', textTransform:'uppercase', fontSize:`${baseFontPx * 0.72}px`, letterSpacing:'0.3px'}}>Amount in Words: </span>
+                  <span style={{fontWeight:'700', fontStyle:'italic'}}>{numberToWords(Number(activePrintBill.total) || 0)}</span>
+                </div>
+              )}
 
               {/* ── FOOTER SECTION (auto-hidden when items > 5) ── */}
               {!isCompact && (
@@ -5106,9 +5126,14 @@ export default function AdminDashboard() {
                 </>
               )}
 
+              {/* ── CUSTOMER SUPPORT & ORDER HELPLINE NUMBER ── */}
+              <div style={{textAlign:'center', fontSize:`${baseFontPx * 0.82}px`, fontWeight:'800', color:'#92400e', padding:'0.8mm 1.5mm', background:'#fef3c7', borderRadius:'1mm', border:'0.5px solid #f59e0b', marginTop:'0.8mm'}}>
+                📞 Customer Care &amp; Orders: <span style={{color:'#451a03', fontWeight:'900'}}>+91 {businessPhone || "8949075688"}</span>
+              </div>
+
               {/* Footer Banner – always show (both compact and normal) */}
               {billFooterMsg && (
-                <div style={{textAlign:'center', background:'#451a03', color:'white', padding:'1mm 2mm', borderRadius:'1mm', fontWeight:'900', fontSize:`${baseFontPx * 0.85}px`, letterSpacing:'1px', textTransform:'uppercase', marginTop:'auto'}}>
+                <div style={{textAlign:'center', background:'#451a03', color:'white', padding:'1mm 2mm', borderRadius:'1mm', fontWeight:'900', fontSize:`${baseFontPx * 0.85}px`, letterSpacing:'1px', textTransform:'uppercase', marginTop:'0.5mm'}}>
                   {billFooterMsg}
                 </div>
               )}
