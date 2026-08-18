@@ -90,6 +90,9 @@ interface Bill {
   cgst: number;
   sgst: number;
   igst: number;
+  cgstRate?: number;
+  sgstRate?: number;
+  igstRate?: number;
   total: number;
   totalCost: number;
   paymentStatus: "Paid" | "Unpaid" | "Partially Paid";
@@ -397,6 +400,9 @@ export default function AdminDashboard() {
           cgst: Number(data.cgst) || 0,
           sgst: Number(data.sgst) || 0,
           igst: Number(data.igst) || 0,
+          cgstRate: data.cgstRate !== undefined ? Number(data.cgstRate) : 1.5,
+          sgstRate: data.sgstRate !== undefined ? Number(data.sgstRate) : 1.5,
+          igstRate: data.igstRate !== undefined ? Number(data.igstRate) : 0,
           total: Number(data.total) || 0,
           totalCost: Number(data.totalCost) || 0,
           paymentStatus: data.paymentStatus || "Paid",
@@ -1616,9 +1622,19 @@ export default function AdminDashboard() {
         id: bill.id,
         type: "Sale",
         refNo: bill.billNo,
+        billNo: bill.billNo,
         customerName: bill.customerName,
         customerPhone: bill.customerPhone,
+        total: bill.total,
         totalAmount: bill.total,
+        subtotal: bill.subtotal,
+        discount: bill.discount,
+        cgst: bill.cgst,
+        sgst: bill.sgst,
+        igst: bill.igst,
+        cgstRate: bill.cgstRate !== undefined ? bill.cgstRate : 1.5,
+        sgstRate: bill.sgstRate !== undefined ? bill.sgstRate : 1.5,
+        igstRate: bill.igstRate !== undefined ? bill.igstRate : 0,
         amountPaid: bill.amountPaid,
         amountDue: bill.amountDue,
         dueDate: bill.dueDate,
@@ -1626,7 +1642,7 @@ export default function AdminDashboard() {
         paymentMethod: bill.paymentMethod || "Cash",
         pdfUrl: bill.pdfUrl,
         totalCost: bill.totalCost || 0,
-        profit: bill.total - bill.discount - (bill.totalCost || 0),
+        profit: bill.total - (bill.discount || 0) - (bill.totalCost || 0),
         items: bill.items || [],
         createdAt: bill.createdAt
       });
@@ -3388,17 +3404,28 @@ export default function AdminDashboard() {
                                       onClick={() => {
                                         setActivePrintBill({
                                           ...tx,
-                                          billNo: tx.billNo || tx.id || tx.refNo || "INV-OLD",
-                                          subtotal: tx.subtotal ?? (tx.items ? tx.items.reduce((acc: number, it: any) => acc + (Number(it.price || 0) * Number(it.quantity || 1)), 0) : (tx.totalAmount || tx.total || 0)),
+                                          billNo: tx.billNo || tx.refNo || tx.id || "INV-OLD",
+                                          customerName: tx.customerName || "Customer",
+                                          customerPhone: tx.customerPhone || "N/A",
+                                          items: tx.items || [],
+                                          subtotal: tx.subtotal !== undefined && tx.subtotal > 0
+                                            ? tx.subtotal
+                                            : tx.items && tx.items.length > 0
+                                            ? tx.items.reduce((acc: number, it: any) => acc + (Number(it.price || 0) * Number(it.quantity || 1)), 0)
+                                            : (tx.totalAmount || tx.total || 0),
                                           total: tx.total ?? tx.totalAmount ?? 0,
-                                          cgst: tx.cgst ?? 0,
-                                          sgst: tx.sgst ?? 0,
-                                          igst: tx.igst ?? 0,
-                                          discount: tx.discount ?? 0,
+                                          cgst: tx.cgst !== undefined ? tx.cgst : 0,
+                                          sgst: tx.sgst !== undefined ? tx.sgst : 0,
+                                          igst: tx.igst !== undefined ? tx.igst : 0,
+                                          cgstRate: tx.cgstRate !== undefined ? tx.cgstRate : 1.5,
+                                          sgstRate: tx.sgstRate !== undefined ? tx.sgstRate : 1.5,
+                                          igstRate: tx.igstRate !== undefined ? tx.igstRate : 0,
+                                          discount: tx.discount || 0,
                                           amountPaid: tx.amountPaid ?? tx.totalAmount ?? tx.total ?? 0,
                                           amountDue: tx.amountDue ?? 0,
-                                          customerName: tx.customerName || "Customer",
-                                          customerPhone: tx.customerPhone || "N/A"
+                                          paymentStatus: tx.paymentStatus || "Paid",
+                                          paymentMethod: tx.paymentMethod || "Cash",
+                                          createdAt: tx.createdAt || new Date()
                                         });
                                         setPrintMode("a4-bill");
                                         document.body.classList.add("print-mode-a4-bill");
@@ -3424,17 +3451,28 @@ export default function AdminDashboard() {
                                       onClick={() => {
                                         setActivePrintBill({
                                           ...tx,
-                                          billNo: tx.billNo || tx.id || tx.refNo || "INV-OLD",
-                                          subtotal: tx.subtotal ?? (tx.items ? tx.items.reduce((acc: number, it: any) => acc + (Number(it.price || 0) * Number(it.quantity || 1)), 0) : (tx.totalAmount || tx.total || 0)),
+                                          billNo: tx.billNo || tx.refNo || tx.id || "INV-OLD",
+                                          customerName: tx.customerName || "Customer",
+                                          customerPhone: tx.customerPhone || "N/A",
+                                          items: tx.items || [],
+                                          subtotal: tx.subtotal !== undefined && tx.subtotal > 0
+                                            ? tx.subtotal
+                                            : tx.items && tx.items.length > 0
+                                            ? tx.items.reduce((acc: number, it: any) => acc + (Number(it.price || 0) * Number(it.quantity || 1)), 0)
+                                            : (tx.totalAmount || tx.total || 0),
                                           total: tx.total ?? tx.totalAmount ?? 0,
-                                          cgst: tx.cgst ?? 0,
-                                          sgst: tx.sgst ?? 0,
-                                          igst: tx.igst ?? 0,
-                                          discount: tx.discount ?? 0,
+                                          cgst: tx.cgst !== undefined ? tx.cgst : 0,
+                                          sgst: tx.sgst !== undefined ? tx.sgst : 0,
+                                          igst: tx.igst !== undefined ? tx.igst : 0,
+                                          cgstRate: tx.cgstRate !== undefined ? tx.cgstRate : 1.5,
+                                          sgstRate: tx.sgstRate !== undefined ? tx.sgstRate : 1.5,
+                                          igstRate: tx.igstRate !== undefined ? tx.igstRate : 0,
+                                          discount: tx.discount || 0,
                                           amountPaid: tx.amountPaid ?? tx.totalAmount ?? tx.total ?? 0,
                                           amountDue: tx.amountDue ?? 0,
-                                          customerName: tx.customerName || "Customer",
-                                          customerPhone: tx.customerPhone || "N/A"
+                                          paymentStatus: tx.paymentStatus || "Paid",
+                                          paymentMethod: tx.paymentMethod || "Cash",
+                                          createdAt: tx.createdAt || new Date()
                                         });
                                         setPrintMode("bill");
                                         document.body.classList.add("print-mode-bill");
@@ -5001,8 +5039,12 @@ export default function AdminDashboard() {
                     <span style={{color:'#92400e'}}>Date:</span>
                     {/* DATE HIGHLIGHTED */}
                     <span style={{fontWeight:'900', color:'#92400e', background:'#fef3c7', padding:'0.4mm 1.5mm', borderRadius:'0.8mm', border:'0.5px solid #f59e0b', whiteSpace:'nowrap'}}>
-                      {activePrintBill.createdAt?.seconds
+                      {activePrintBill.createdAt instanceof Date
+                        ? activePrintBill.createdAt.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })
+                        : activePrintBill.createdAt?.seconds
                         ? new Date(activePrintBill.createdAt.seconds * 1000).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })
+                        : typeof activePrintBill.createdAt === 'string'
+                        ? new Date(activePrintBill.createdAt).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })
                         : new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}
                     </span>
                   </div>
