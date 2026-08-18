@@ -1074,7 +1074,7 @@ export default function AdminDashboard() {
             // Inject dynamic @page size so printer gets exact paper dimensions
             const dynStyle = document.createElement('style');
             dynStyle.id = '__jsk_dynamic_page_size__';
-            dynStyle.textContent = `@media print { @page { size: ${billPageWidth}mm ${billPageHeight}mm; margin: 0mm !important; } }`;
+            dynStyle.textContent = `@media print { @page { size: ${billPageWidth}mm ${billPageHeight}mm; margin: 0mm !important; } * { -webkit-text-size-adjust: none !important; text-size-adjust: none !important; } html, body { width: ${billPageWidth}mm !important; height: ${billPageHeight}mm !important; margin: 0 !important; padding: 0 !important; overflow: hidden !important; } }`;
             document.head.appendChild(dynStyle);
             window.print();
             setTimeout(() => {
@@ -3432,7 +3432,7 @@ export default function AdminDashboard() {
                                         setTimeout(() => {
                                           const dynStyle = document.createElement('style');
                                           dynStyle.id = '__jsk_dynamic_page_size__';
-                                          dynStyle.textContent = `@media print { @page { size: ${billPageWidth}mm ${billPageHeight}mm; margin: 0mm !important; } }`;
+                                          dynStyle.textContent = `@media print { @page { size: ${billPageWidth}mm ${billPageHeight}mm; margin: 0mm !important; } * { -webkit-text-size-adjust: none !important; text-size-adjust: none !important; } html, body { width: ${billPageWidth}mm !important; height: ${billPageHeight}mm !important; margin: 0 !important; padding: 0 !important; overflow: hidden !important; } }`;
                                           document.head.appendChild(dynStyle);
                                           window.print();
                                           setTimeout(() => {
@@ -4965,8 +4965,8 @@ export default function AdminDashboard() {
         const itemCount = activePrintBill.items?.length || 0;
         // Auto-compact: hide extras when items > 5 to keep single page
         const isCompact = itemCount > 5;
-        // 2x font: small=8, medium=10, large=12, xlarge=14
-        const baseFontPx = billFontSize === 'small' ? 8 : billFontSize === 'large' ? 12 : billFontSize === 'xlarge' ? 14 : 10;
+        // Standard physical typography points (pt) - 100% consistent on Tablets & PC
+        const baseFontPt = billFontSize === 'small' ? 7 : billFontSize === 'large' ? 9.5 : billFontSize === 'xlarge' ? 11 : 8.5;
 
         // Robust GST calculations & rates
         const subtotalVal = Number(activePrintBill.subtotal) || 0;
@@ -4999,221 +4999,227 @@ export default function AdminDashboard() {
                 maxWidth: `${billPageWidth}mm`,
                 height: `${billPageHeight}mm`,
                 maxHeight: `${billPageHeight}mm`,
-                margin: 0,
-                padding: '2.5mm 5.5mm 2.5mm 3.5mm',
+                margin: '0 auto',
+                padding: '2mm 4.5mm 2mm 3mm',
                 boxSizing: 'border-box',
-                fontFamily: 'Arial, sans-serif',
-                fontSize: `${baseFontPx}px`,
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+                fontSize: `${baseFontPt}pt`,
+                lineHeight: 1.25,
                 color: '#3d2000',
                 background: 'white',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '1mm',
+                justifyContent: 'space-between',
+                gap: '0.8mm',
                 overflow: 'hidden',
               }}
             >
 
-              {/* ── HEADER ── */}
-              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:'2px solid #92400e', paddingBottom:'1.5mm'}}>
-                <div style={{display:'flex', alignItems:'center', gap:'2.5mm', minWidth: 0}}>
-                  {businessLogo ? (
-                    <img src={businessLogo} alt="Logo" style={{width:'16mm', height:'16mm', objectFit:'contain', borderRadius:'1.5mm', flexShrink: 0, border:'1px solid #fde68a'}} />
-                  ) : (
-                    <div style={{width:'16mm', height:'16mm', border:'1.5px solid #b45309', borderRadius:'1.5mm', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'7px', fontWeight:'bold', color:'#92400e', background:'#fffbeb', flexShrink: 0}}>LOGO</div>
-                  )}
-                  <div style={{minWidth: 0}}>
-                    <div style={{fontSize:`${baseFontPx * 1.5}px`, fontWeight:'900', textTransform:'uppercase', letterSpacing:'-0.3px', lineHeight:1.1}}>{businessName || 'JSK ART JEWELLERY'}</div>
-                    <div style={{fontSize:`${baseFontPx * 0.85}px`, color:'#92400e', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.5px', marginTop:'0.4mm'}}>{businessSub || "Wholesalers & Mfrs of Diamond and Gold Jewellery"}</div>
-                    <div style={{fontSize:`${baseFontPx * 0.82}px`, color:'#78350f', marginTop:'0.3mm', lineHeight:1.25, fontWeight:'600'}}>{businessAddress || "No. 123, 2nd Floor, Sowcarpet, CHENNAI - 600079"}</div>
-                    <div style={{fontSize:`${baseFontPx * 0.8}px`, color:'#92400e', marginTop:'0.3mm', fontWeight:'700'}}>📞 Phone: +91 {businessPhone || "8949075688"}</div>
+              {/* ── TOP SECTION (Header + Customer + Items) ── */}
+              <div>
+                {/* ── HEADER ── */}
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:'1.5px solid #92400e', paddingBottom:'1.2mm'}}>
+                  <div style={{display:'flex', alignItems:'center', gap:'2mm', minWidth: 0}}>
+                    {businessLogo ? (
+                      <img src={businessLogo} alt="Logo" style={{width:'14mm', height:'14mm', objectFit:'contain', borderRadius:'1mm', flexShrink: 0, border:'1px solid #fde68a'}} />
+                    ) : (
+                      <div style={{width:'14mm', height:'14mm', border:'1px solid #b45309', borderRadius:'1mm', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'6pt', fontWeight:'bold', color:'#92400e', background:'#fffbeb', flexShrink: 0}}>LOGO</div>
+                    )}
+                    <div style={{minWidth: 0}}>
+                      <div style={{fontSize:`${baseFontPt * 1.3}pt`, fontWeight:'900', textTransform:'uppercase', letterSpacing:'-0.2px', lineHeight:1.1, color:'#451a03'}}>{businessName || 'JSK ART JEWELLERY'}</div>
+                      <div style={{fontSize:`${baseFontPt * 0.78}pt`, color:'#92400e', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.3px', marginTop:'0.2mm'}}>{businessSub || "Wholesalers & Mfrs of Diamond and Gold Jewellery"}</div>
+                      <div style={{fontSize:`${baseFontPt * 0.75}pt`, color:'#78350f', marginTop:'0.2mm', lineHeight:1.2, fontWeight:'600'}}>{businessAddress || "No. 123, 2nd Floor, Sowcarpet, CHENNAI - 600079"}</div>
+                      <div style={{fontSize:`${baseFontPt * 0.75}pt`, color:'#92400e', marginTop:'0.2mm', fontWeight:'700'}}>📞 Phone: +91 {businessPhone || "8949075688"}</div>
+                    </div>
+                  </div>
+                  {/* Invoice info top-right */}
+                  <div style={{textAlign:'right', fontSize:`${baseFontPt * 0.78}pt`, paddingRight:'1mm', flexShrink: 0}}>
+                    <div style={{fontWeight:'900', fontSize:`${baseFontPt * 0.95}pt`, color:'#451a03', textTransform:'uppercase', letterSpacing:'0.4px', marginBottom:'0.3mm'}}>TAX INVOICE</div>
+                    <div style={{display:'flex', gap:'1mm', justifyContent:'flex-end', alignItems:'center'}}>
+                      <span style={{color:'#92400e'}}>Invoice No:</span>
+                      <span style={{fontWeight:'800', color:'#1c1917'}}>{activePrintBill.billNo}</span>
+                    </div>
+                    <div style={{display:'flex', gap:'1mm', justifyContent:'flex-end', alignItems:'center', marginTop:'0.3mm'}}>
+                      <span style={{color:'#92400e'}}>Date:</span>
+                      {/* DATE HIGHLIGHTED */}
+                      <span style={{fontWeight:'900', color:'#92400e', background:'#fef3c7', padding:'0.3mm 1.2mm', borderRadius:'0.6mm', border:'0.5px solid #f59e0b', whiteSpace:'nowrap'}}>
+                        {activePrintBill.createdAt instanceof Date
+                          ? activePrintBill.createdAt.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })
+                          : activePrintBill.createdAt?.seconds
+                          ? new Date(activePrintBill.createdAt.seconds * 1000).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })
+                          : typeof activePrintBill.createdAt === 'string'
+                          ? new Date(activePrintBill.createdAt).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })
+                          : new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}
+                      </span>
+                    </div>
+                    <div style={{marginTop:'0.3mm', color:'#78350f', whiteSpace:'nowrap'}}><span style={{fontWeight:'700'}}>GSTIN:</span> {businessGstin || "33AAEFJ2110L1ZS"}</div>
                   </div>
                 </div>
-                {/* Invoice info top-right */}
-                <div style={{textAlign:'right', fontSize:`${baseFontPx * 0.85}px`, paddingRight:'1.5mm', flexShrink: 0}}>
-                  <div style={{fontWeight:'900', fontSize:`${baseFontPx * 1.05}px`, color:'#451a03', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:'0.5mm'}}>TAX INVOICE</div>
-                  <div style={{display:'flex', gap:'1mm', justifyContent:'flex-end', alignItems:'center'}}>
-                    <span style={{color:'#92400e'}}>Invoice No:</span>
-                    <span style={{fontWeight:'800', color:'#1c1917'}}>{activePrintBill.billNo}</span>
-                  </div>
-                  <div style={{display:'flex', gap:'1mm', justifyContent:'flex-end', alignItems:'center', marginTop:'0.5mm'}}>
-                    <span style={{color:'#92400e'}}>Date:</span>
-                    {/* DATE HIGHLIGHTED */}
-                    <span style={{fontWeight:'900', color:'#92400e', background:'#fef3c7', padding:'0.4mm 1.5mm', borderRadius:'0.8mm', border:'0.5px solid #f59e0b', whiteSpace:'nowrap'}}>
-                      {activePrintBill.createdAt instanceof Date
-                        ? activePrintBill.createdAt.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })
-                        : activePrintBill.createdAt?.seconds
-                        ? new Date(activePrintBill.createdAt.seconds * 1000).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })
-                        : typeof activePrintBill.createdAt === 'string'
-                        ? new Date(activePrintBill.createdAt).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })
-                        : new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}
-                    </span>
-                  </div>
-                  <div style={{marginTop:'0.5mm', color:'#78350f', whiteSpace:'nowrap'}}><span style={{fontWeight:'700'}}>GSTIN:</span> {businessGstin || "33AAEFJ2110L1ZS"}</div>
-                </div>
-              </div>
 
-              {/* ── CUSTOMER ROW ── */}
-              <div style={{display:'flex', justifyContent:'space-between', fontSize:`${baseFontPx * 0.9}px`, padding:'1mm 0', borderBottom:'0.5px solid #fde68a'}}>
-                <div>
-                  <span style={{color:'#92400e'}}>Bill To: </span>
-                  <span style={{fontWeight:'900', fontSize:`${baseFontPx * 1.05}px`, color:'#1c1917'}}>{activePrintBill.customerName}</span>
-                  {billShowMobile && activePrintBill.customerPhone && activePrintBill.customerPhone !== 'N/A' && (
-                    <span style={{marginLeft:'2mm', color:'#78350f'}}>📞 {activePrintBill.customerPhone}</span>
-                  )}
+                {/* ── CUSTOMER ROW ── */}
+                <div style={{display:'flex', justifyContent:'space-between', fontSize:`${baseFontPt * 0.82}pt`, padding:'0.8mm 0', borderBottom:'0.5px solid #fde68a'}}>
+                  <div>
+                    <span style={{color:'#92400e'}}>Bill To: </span>
+                    <span style={{fontWeight:'900', fontSize:`${baseFontPt * 0.9}pt`, color:'#1c1917'}}>{activePrintBill.customerName}</span>
+                    {billShowMobile && activePrintBill.customerPhone && activePrintBill.customerPhone !== 'N/A' && (
+                      <span style={{marginLeft:'2mm', color:'#78350f'}}>📞 {activePrintBill.customerPhone}</span>
+                    )}
+                  </div>
+                  <div style={{textAlign:'right', paddingRight:'1mm'}}>
+                    <span style={{color:'#92400e'}}>Payment: </span>
+                    <span style={{fontWeight:'700', color:'#1c1917'}}>{activePrintBill.paymentMethod || 'Cash'}</span>
+                    {billShowPlaceOfSupply && <div style={{color:'#78350f'}}>State: Tamil Nadu (33)</div>}
+                  </div>
                 </div>
-                <div style={{textAlign:'right', paddingRight:'1.5mm'}}>
-                  <span style={{color:'#92400e'}}>Payment: </span>
-                  <span style={{fontWeight:'700', color:'#1c1917'}}>{activePrintBill.paymentMethod || 'Cash'}</span>
-                  {billShowPlaceOfSupply && <div style={{color:'#78350f'}}>State: Tamil Nadu (33)</div>}
-                </div>
-              </div>
 
-              {/* ── ITEMS TABLE ── */}
-              <div style={{flex: '0 0 auto'}}>
-                <table style={{width:'100%', borderCollapse:'collapse', fontSize:`${baseFontPx * 0.9}px`, tableLayout:'fixed'}}>
-                  <colgroup>
-                    <col style={{width:'5mm'}} />
-                    <col />
-                    <col style={{width:'9mm'}} />
-                    <col style={{width:'17mm'}} />
-                    <col style={{width:'6mm'}} />
-                    <col style={{width:'19mm'}} />
-                  </colgroup>
-                  <thead>
-                    <tr style={{background:'#451a03', color:'white'}}>
-                      <th style={{padding:'1.5mm 0.5mm', textAlign:'center', borderRadius:'1mm 0 0 1mm'}}>#</th>
-                      <th style={{padding:'1.5mm 1mm', textAlign:'left'}}>Item Description</th>
-                      <th style={{padding:'1.5mm 0.5mm', textAlign:'center'}}>Size</th>
-                      {/* PRICE HIGHLIGHTED */}
-                      <th style={{padding:'1.5mm 1mm', textAlign:'right', background:'#7c2d12', color:'#fef3c7'}}>Rate</th>
-                      <th style={{padding:'1.5mm 0.5mm', textAlign:'center'}}>Qty</th>
-                      <th style={{padding:'1.5mm 2.5mm 1.5mm 1mm', textAlign:'right', borderRadius:'0 1mm 1mm 0'}}>Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {activePrintBill.items?.map((item: any, idx: number) => (
-                      <tr key={idx} style={{borderBottom:'0.5px solid #fde68a', background: idx % 2 === 0 ? '#fff' : '#fffbeb'}}>
-                        <td style={{padding:'1.5mm 0.5mm', textAlign:'center', color:'#92400e', fontWeight:'700'}}>{idx + 1}</td>
-                        <td style={{padding:'1.5mm 1mm', fontWeight:'700', color:'#1c1917', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{item.name}</td>
-                        <td style={{padding:'1.5mm 0.5mm', textAlign:'center', color:'#78350f'}}>{item.size || '—'}</td>
-                        {/* PRICE CELL HIGHLIGHTED */}
-                        <td style={{padding:'1.5mm 1mm', textAlign:'right', fontWeight:'800', color:'#92400e', background:'#fef9ee', whiteSpace:'nowrap'}}>
-                          ₹{Number(item.price).toLocaleString('en-IN', {minimumFractionDigits:2})}
-                        </td>
-                        <td style={{padding:'1.5mm 0.5mm', textAlign:'center', fontWeight:'800', color:'#1c1917'}}>{item.quantity}</td>
-                        <td style={{padding:'1.5mm 2.5mm 1.5mm 1mm', textAlign:'right', fontWeight:'800', color:'#1c1917', whiteSpace:'nowrap'}}>
-                          ₹{(Number(item.price) * Number(item.quantity)).toLocaleString('en-IN', {minimumFractionDigits:2})}
-                        </td>
+                {/* ── ITEMS TABLE ── */}
+                <div style={{marginTop:'0.5mm'}}>
+                  <table style={{width:'100%', borderCollapse:'collapse', fontSize:`${baseFontPt * 0.8}pt`, tableLayout:'fixed'}}>
+                    <colgroup>
+                      <col style={{width:'5mm'}} />
+                      <col />
+                      <col style={{width:'8mm'}} />
+                      <col style={{width:'16mm'}} />
+                      <col style={{width:'6mm'}} />
+                      <col style={{width:'18mm'}} />
+                    </colgroup>
+                    <thead>
+                      <tr style={{background:'#451a03', color:'white'}}>
+                        <th style={{padding:'1mm 0.5mm', textAlign:'center', borderRadius:'0.8mm 0 0 0.8mm'}}>#</th>
+                        <th style={{padding:'1mm 1mm', textAlign:'left'}}>Item Description</th>
+                        <th style={{padding:'1mm 0.5mm', textAlign:'center'}}>Size</th>
+                        <th style={{padding:'1mm 1mm', textAlign:'right', background:'#7c2d12', color:'#fef3c7'}}>Rate</th>
+                        <th style={{padding:'1mm 0.5mm', textAlign:'center'}}>Qty</th>
+                        <th style={{padding:'1mm 2mm 1mm 1mm', textAlign:'right', borderRadius:'0 0.8mm 0.8mm 0'}}>Amount</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* ── TOTALS – full width right-aligned with safety padding ── */}
-              <div style={{borderTop:'1.5px solid #451a03', paddingTop:'1mm', marginTop:'0.5mm'}}>
-                <div style={{marginLeft:'auto', width:'65%', fontSize:`${baseFontPx * 0.9}px`, paddingRight:'1.5mm'}}>
-                  <div style={{display:'flex', justifyContent:'space-between', padding:'0.4mm 0', color:'#78350f'}}>
-                    <span>Subtotal (Taxable):</span>
-                    <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>₹{subtotalVal.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
-                  </div>
-                  {discountVal > 0 && (
-                    <div style={{display:'flex', justifyContent:'space-between', padding:'0.4mm 0', color:'#15803d'}}>
-                      <span>Discount:</span>
-                      <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>-₹{discountVal.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
-                    </div>
-                  )}
-                  {cgstVal > 0 && (
-                    <div style={{display:'flex', justifyContent:'space-between', padding:'0.4mm 0', color:'#78350f'}}>
-                      <span>CGST ({cgstRateVal}%):</span>
-                      <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>₹{cgstVal.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
-                    </div>
-                  )}
-                  {sgstVal > 0 && (
-                    <div style={{display:'flex', justifyContent:'space-between', padding:'0.4mm 0', color:'#78350f'}}>
-                      <span>SGST ({sgstRateVal}%):</span>
-                      <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>₹{sgstVal.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
-                    </div>
-                  )}
-                  {igstVal > 0 && (
-                    <div style={{display:'flex', justifyContent:'space-between', padding:'0.4mm 0', color:'#78350f'}}>
-                      <span>IGST ({igstRateVal}%):</span>
-                      <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>₹{igstVal.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
-                    </div>
-                  )}
-                  {/* GRAND TOTAL – BIG HIGHLIGHT */}
-                  <div style={{display:'flex', justifyContent:'space-between', padding:'1.5mm 2.5mm', marginTop:'0.8mm', background:'#451a03', color:'white', borderRadius:'1mm', fontWeight:'900', fontSize:`${baseFontPx * 1.15}px`, whiteSpace:'nowrap', boxSizing:'border-box'}}>
-                    <span>GRAND TOTAL</span>
-                    <span>₹{totalCalculated.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
-                  </div>
-                  <div style={{display:'flex', justifyContent:'space-between', padding:'0.4mm 0', color:'#15803d', fontWeight:'700', marginTop:'0.3mm'}}>
-                    <span>Amount Paid:</span>
-                    <span style={{whiteSpace:'nowrap'}}>₹{Number(activePrintBill.amountPaid || totalCalculated).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
-                  </div>
-                  {Number(activePrintBill.amountDue) > 0 && (
-                    <div style={{display:'flex', justifyContent:'space-between', padding:'0.4mm 0', color:'#be123c', fontWeight:'900'}}>
-                      <span>Balance Due:</span>
-                      <span style={{whiteSpace:'nowrap'}}>₹{Number(activePrintBill.amountDue).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
-                    </div>
-                  )}
+                    </thead>
+                    <tbody>
+                      {activePrintBill.items?.map((item: any, idx: number) => (
+                        <tr key={idx} style={{borderBottom:'0.5px solid #fde68a', background: idx % 2 === 0 ? '#fff' : '#fffbeb'}}>
+                          <td style={{padding:'1mm 0.5mm', textAlign:'center', color:'#92400e', fontWeight:'700'}}>{idx + 1}</td>
+                          <td style={{padding:'1mm 1mm', fontWeight:'700', color:'#1c1917', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{item.name}</td>
+                          <td style={{padding:'1mm 0.5mm', textAlign:'center', color:'#78350f'}}>{item.size || '—'}</td>
+                          <td style={{padding:'1mm 1mm', textAlign:'right', fontWeight:'800', color:'#92400e', background:'#fef9ee', whiteSpace:'nowrap'}}>
+                            ₹{Number(item.price).toLocaleString('en-IN', {minimumFractionDigits:2})}
+                          </td>
+                          <td style={{padding:'1mm 0.5mm', textAlign:'center', fontWeight:'800', color:'#1c1917'}}>{item.quantity}</td>
+                          <td style={{padding:'1mm 2mm 1mm 1mm', textAlign:'right', fontWeight:'800', color:'#1c1917', whiteSpace:'nowrap'}}>
+                            ₹{(Number(item.price) * Number(item.quantity)).toLocaleString('en-IN', {minimumFractionDigits:2})}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
-              {/* ── AMOUNT IN WORDS (Clean Dedicated Full-Width Banner) ── */}
-              {billShowAmountWords && (
-                <div style={{marginTop:'0.8mm', padding:'0.8mm 2mm', background:'#fffbeb', borderRadius:'1mm', border:'0.5px solid #fde68a', fontSize:`${baseFontPx * 0.82}px`, color:'#451a03', lineHeight:1.25}}>
-                  <span style={{fontWeight:'900', color:'#92400e', textTransform:'uppercase', fontSize:`${baseFontPx * 0.72}px`, letterSpacing:'0.3px'}}>Amount in Words: </span>
-                  <span style={{fontWeight:'700', fontStyle:'italic'}}>{numberToWords(Number(activePrintBill.total) || 0)}</span>
-                </div>
-              )}
-
-              {/* ── FOOTER SECTION (auto-hidden when items > 5) ── */}
-              {!isCompact && (
-                <>
-                  {/* Bank details */}
-                  {showBankDetails && bankName && (
-                    <div style={{borderTop:'0.5px dashed #fde68a', paddingTop:'1mm', marginTop:'0.5mm', fontSize:`${baseFontPx * 0.8}px`}}>
-                      <div style={{fontWeight:'800', color:'#92400e', marginBottom:'0.3mm'}}>Bank Details:</div>
-                      <div style={{color:'#78350f'}}>Bank: {bankName} &nbsp;|&nbsp; A/c: {bankAccount} &nbsp;|&nbsp; IFSC: {bankIfsc}</div>
+              {/* ── BOTTOM SECTION (Totals + Amount in Words + Footer) ── */}
+              <div>
+                {/* ── TOTALS – full width right-aligned with safety padding ── */}
+                <div style={{borderTop:'1.2px solid #451a03', paddingTop:'0.8mm', marginTop:'0.5mm'}}>
+                  <div style={{marginLeft:'auto', width:'65%', fontSize:`${baseFontPt * 0.8}pt`, paddingRight:'1mm'}}>
+                    <div style={{display:'flex', justifyContent:'space-between', padding:'0.3mm 0', color:'#78350f'}}>
+                      <span>Subtotal (Taxable):</span>
+                      <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>₹{subtotalVal.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
                     </div>
-                  )}
-
-                  {/* Terms & Extra Note */}
-                  {(billTermsText || billExtraNote) && (
-                    <div style={{borderTop:'0.5px dashed #fde68a', paddingTop:'0.8mm', marginTop:'0.5mm', fontSize:`${baseFontPx * 0.75}px`, color:'#78350f'}}>
-                      {billTermsText && <div><span style={{fontWeight:'800'}}>Terms: </span>{billTermsText}</div>}
-                      {billExtraNote && <div style={{marginTop:'0.3mm'}}><span style={{fontWeight:'800'}}>Note: </span>{billExtraNote}</div>}
-                    </div>
-                  )}
-
-                  {/* Signatures */}
-                  {billShowSignature && (
-                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', paddingTop:'3mm', fontSize:`${baseFontPx * 0.8}px`, fontWeight:'700', color:'#92400e'}}>
-                      <div style={{textAlign:'center'}}>
-                        <div style={{borderBottom:'1px solid #d97706', width:'28mm', marginBottom:'0.5mm'}}></div>
-                        <div>Customer's Signature</div>
+                    {discountVal > 0 && (
+                      <div style={{display:'flex', justifyContent:'space-between', padding:'0.3mm 0', color:'#15803d'}}>
+                        <span>Discount:</span>
+                        <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>-₹{discountVal.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
                       </div>
-                      <div style={{textAlign:'center'}}>
-                        <div style={{fontSize:`${baseFontPx * 0.7}px`, color:'#a16207', marginBottom:'3mm', textTransform:'uppercase'}}>for {businessName}</div>
-                        <div style={{borderBottom:'1px solid #d97706', width:'28mm', marginBottom:'0.5mm'}}></div>
-                        <div>Authorised Signatory</div>
+                    )}
+                    {cgstVal > 0 && (
+                      <div style={{display:'flex', justifyContent:'space-between', padding:'0.3mm 0', color:'#78350f'}}>
+                        <span>CGST ({cgstRateVal}%):</span>
+                        <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>₹{cgstVal.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
                       </div>
+                    )}
+                    {sgstVal > 0 && (
+                      <div style={{display:'flex', justifyContent:'space-between', padding:'0.3mm 0', color:'#78350f'}}>
+                        <span>SGST ({sgstRateVal}%):</span>
+                        <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>₹{sgstVal.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                      </div>
+                    )}
+                    {igstVal > 0 && (
+                      <div style={{display:'flex', justifyContent:'space-between', padding:'0.3mm 0', color:'#78350f'}}>
+                        <span>IGST ({igstRateVal}%):</span>
+                        <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>₹{igstVal.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                      </div>
+                    )}
+                    {/* GRAND TOTAL – BIG HIGHLIGHT */}
+                    <div style={{display:'flex', justifyContent:'space-between', padding:'1.2mm 2mm', marginTop:'0.6mm', background:'#451a03', color:'white', borderRadius:'0.8mm', fontWeight:'900', fontSize:`${baseFontPt * 1.05}pt`, whiteSpace:'nowrap', boxSizing:'border-box'}}>
+                      <span>GRAND TOTAL</span>
+                      <span>₹{totalCalculated.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
                     </div>
-                  )}
-                </>
-              )}
-
-              {/* ── CUSTOMER SUPPORT & ORDER HELPLINE NUMBER ── */}
-              <div style={{textAlign:'center', fontSize:`${baseFontPx * 0.82}px`, fontWeight:'800', color:'#92400e', padding:'0.8mm 1.5mm', background:'#fef3c7', borderRadius:'1mm', border:'0.5px solid #f59e0b', marginTop:'0.8mm'}}>
-                📞 Customer Care &amp; Orders: <span style={{color:'#451a03', fontWeight:'900'}}>+91 {businessPhone || "8949075688"}</span>
-              </div>
-
-              {/* Footer Banner – always show (both compact and normal) */}
-              {billFooterMsg && (
-                <div style={{textAlign:'center', background:'#451a03', color:'white', padding:'1mm 2mm', borderRadius:'1mm', fontWeight:'900', fontSize:`${baseFontPx * 0.85}px`, letterSpacing:'1px', textTransform:'uppercase', marginTop:'0.5mm'}}>
-                  {billFooterMsg}
+                    <div style={{display:'flex', justifyContent:'space-between', padding:'0.3mm 0', color:'#15803d', fontWeight:'700', marginTop:'0.2mm'}}>
+                      <span>Amount Paid:</span>
+                      <span style={{whiteSpace:'nowrap'}}>₹{Number(activePrintBill.amountPaid || totalCalculated).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                    </div>
+                    {Number(activePrintBill.amountDue) > 0 && (
+                      <div style={{display:'flex', justifyContent:'space-between', padding:'0.3mm 0', color:'#be123c', fontWeight:'900'}}>
+                        <span>Balance Due:</span>
+                        <span style={{whiteSpace:'nowrap'}}>₹{Number(activePrintBill.amountDue).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
+
+                {/* ── AMOUNT IN WORDS (Clean Dedicated Full-Width Banner) ── */}
+                {billShowAmountWords && (
+                  <div style={{marginTop:'0.6mm', padding:'0.6mm 1.5mm', background:'#fffbeb', borderRadius:'0.8mm', border:'0.5px solid #fde68a', fontSize:`${baseFontPt * 0.72}pt`, color:'#451a03', lineHeight:1.2}}>
+                    <span style={{fontWeight:'900', color:'#92400e', textTransform:'uppercase', fontSize:`${baseFontPt * 0.65}pt`, letterSpacing:'0.2px'}}>Amount in Words: </span>
+                    <span style={{fontWeight:'700', fontStyle:'italic'}}>{numberToWords(Number(activePrintBill.total) || 0)}</span>
+                  </div>
+                )}
+
+                {/* ── FOOTER SECTION (auto-hidden when items > 5) ── */}
+                {!isCompact && (
+                  <>
+                    {/* Bank details */}
+                    {showBankDetails && bankName && (
+                      <div style={{borderTop:'0.5px dashed #fde68a', paddingTop:'0.8mm', marginTop:'0.4mm', fontSize:`${baseFontPt * 0.7}pt`}}>
+                        <div style={{fontWeight:'800', color:'#92400e', marginBottom:'0.2mm'}}>Bank Details:</div>
+                        <div style={{color:'#78350f'}}>Bank: {bankName} &nbsp;|&nbsp; A/c: {bankAccount} &nbsp;|&nbsp; IFSC: {bankIfsc}</div>
+                      </div>
+                    )}
+
+                    {/* Terms & Extra Note */}
+                    {(billTermsText || billExtraNote) && (
+                      <div style={{borderTop:'0.5px dashed #fde68a', paddingTop:'0.6mm', marginTop:'0.4mm', fontSize:`${baseFontPt * 0.65}pt`, color:'#78350f'}}>
+                        {billTermsText && <div><span style={{fontWeight:'800'}}>Terms: </span>{billTermsText}</div>}
+                        {billExtraNote && <div style={{marginTop:'0.2mm'}}><span style={{fontWeight:'800'}}>Note: </span>{billExtraNote}</div>}
+                      </div>
+                    )}
+
+                    {/* Signatures */}
+                    {billShowSignature && (
+                      <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', paddingTop:'2mm', fontSize:`${baseFontPt * 0.7}pt`, fontWeight:'700', color:'#92400e'}}>
+                        <div style={{textAlign:'center'}}>
+                          <div style={{borderBottom:'1px solid #d97706', width:'25mm', marginBottom:'0.4mm'}}></div>
+                          <div>Customer's Signature</div>
+                        </div>
+                        <div style={{textAlign:'center'}}>
+                          <div style={{fontSize:`${baseFontPt * 0.62}pt`, color:'#a16207', marginBottom:'2mm', textTransform:'uppercase'}}>for {businessName}</div>
+                          <div style={{borderBottom:'1px solid #d97706', width:'25mm', marginBottom:'0.4mm'}}></div>
+                          <div>Authorised Signatory</div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* ── CUSTOMER SUPPORT & ORDER HELPLINE NUMBER ── */}
+                <div style={{textAlign:'center', fontSize:`${baseFontPt * 0.72}pt`, fontWeight:'800', color:'#92400e', padding:'0.6mm 1.2mm', background:'#fef3c7', borderRadius:'0.8mm', border:'0.5px solid #f59e0b', marginTop:'0.6mm'}}>
+                  📞 Customer Care &amp; Orders: <span style={{color:'#451a03', fontWeight:'900'}}>+91 {businessPhone || "8949075688"}</span>
+                </div>
+
+                {/* Footer Banner – always show (both compact and normal) */}
+                {billFooterMsg && (
+                  <div style={{textAlign:'center', background:'#451a03', color:'white', padding:'0.8mm 1.5mm', borderRadius:'0.8mm', fontWeight:'900', fontSize:`${baseFontPt * 0.75}pt`, letterSpacing:'0.8px', textTransform:'uppercase', marginTop:'0.4mm'}}>
+                    {billFooterMsg}
+                  </div>
+                )}
+              </div>
 
             </div>
           </div>
@@ -5225,10 +5231,23 @@ export default function AdminDashboard() {
       <style dangerouslySetInnerHTML={{__html: `
         @media print {
           /* --- BASE: Hide everything by default --- */
-          body {
+          * {
+            -webkit-text-size-adjust: none !important;
+            text-size-adjust: none !important;
+            -webkit-font-smoothing: antialiased !important;
+          }
+
+          html, body {
             background: white !important;
             margin: 0 !important;
             padding: 0 !important;
+            width: ${billPageWidth}mm !important;
+            height: ${billPageHeight}mm !important;
+            max-width: ${billPageWidth}mm !important;
+            max-height: ${billPageHeight}mm !important;
+            overflow: hidden !important;
+            -webkit-text-size-adjust: none !important;
+            text-size-adjust: none !important;
           }
 
           /* Hide the entire admin UI panel */
@@ -5245,7 +5264,7 @@ export default function AdminDashboard() {
           body.print-mode-barcode #printable-barcode-area {
             display: block !important;
             visibility: visible !important;
-            position: absolute !important;
+            position: fixed !important;
             left: 0 !important;
             top: 0 !important;
             width: 80mm !important;
@@ -5270,7 +5289,7 @@ export default function AdminDashboard() {
           }
           body.print-mode-bill #printable-bill-area {
             display: block !important;
-            position: absolute !important;
+            position: fixed !important;
             left: 0 !important;
             top: 0 !important;
             width: 100% !important;
@@ -5282,13 +5301,15 @@ export default function AdminDashboard() {
           body.print-mode-a4-bill #printable-a4-bill-area {
             display: block !important;
             visibility: visible !important;
-            position: absolute !important;
+            position: fixed !important;
             left: 0 !important;
             top: 0 !important;
             width: ${billPageWidth}mm !important;
             max-width: ${billPageWidth}mm !important;
             height: ${billPageHeight}mm !important;
             max-height: ${billPageHeight}mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
             overflow: hidden !important;
             page-break-after: avoid !important;
             break-after: avoid !important;
@@ -5297,11 +5318,16 @@ export default function AdminDashboard() {
             box-sizing: border-box !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+            -webkit-text-size-adjust: none !important;
+            text-size-adjust: none !important;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
           }
           body.print-mode-a4-bill #printable-a4-bill-area * {
             visibility: visible !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+            -webkit-text-size-adjust: none !important;
+            text-size-adjust: none !important;
           }
 
           /* --- SINGLE LABEL PAGE RULES --- */
