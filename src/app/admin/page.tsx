@@ -4894,7 +4894,8 @@ export default function AdminDashboard() {
         const itemCount = activePrintBill.items?.length || 0;
         // Auto-compact: hide extras when items > 5 to keep single page
         const isCompact = itemCount > 5;
-        const baseFontPx = billFontSize === 'small' ? 6 : billFontSize === 'large' ? 9 : billFontSize === 'xlarge' ? 10 : 7.5;
+        // 2x font: small=8, medium=10, large=12, xlarge=14
+        const baseFontPx = billFontSize === 'small' ? 8 : billFontSize === 'large' ? 12 : billFontSize === 'xlarge' ? 14 : 10;
 
         return (
           <div id="printable-a4-bill-area" style={{margin: 0, padding: 0}}>
@@ -4902,9 +4903,10 @@ export default function AdminDashboard() {
               style={{
                 width: `${billPageWidth}mm`,
                 maxWidth: `${billPageWidth}mm`,
-                minHeight: `${billPageHeight}mm`,
+                height: `${billPageHeight}mm`,
+                maxHeight: `${billPageHeight}mm`,
                 margin: 0,
-                padding: '2mm',
+                padding: '2.5mm',
                 boxSizing: 'border-box',
                 fontFamily: 'Arial, sans-serif',
                 fontSize: `${baseFontPx}px`,
@@ -4912,7 +4914,7 @@ export default function AdminDashboard() {
                 background: 'white',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '1.5mm',
+                gap: '1mm',
                 overflow: 'hidden',
               }}
             >
@@ -4968,31 +4970,39 @@ export default function AdminDashboard() {
               </div>
 
               {/* ── ITEMS TABLE ── */}
-              <div style={{flex: isCompact ? 'none' : '0 0 auto'}}>
-                <table style={{width:'100%', borderCollapse:'collapse', fontSize:`${baseFontPx * 0.95}px`}}>
+              <div style={{flex: '0 0 auto'}}>
+                <table style={{width:'100%', borderCollapse:'collapse', fontSize:`${baseFontPx * 0.9}px`, tableLayout:'fixed'}}>
+                  <colgroup>
+                    <col style={{width:'6mm'}} />
+                    <col />
+                    <col style={{width:'10mm'}} />
+                    <col style={{width:'18mm'}} />
+                    <col style={{width:'7mm'}} />
+                    <col style={{width:'20mm'}} />
+                  </colgroup>
                   <thead>
                     <tr style={{background:'#451a03', color:'white'}}>
-                      <th style={{padding:'1.2mm 1mm', width:'5mm', textAlign:'center', borderRadius:'1mm 0 0 1mm'}}>#</th>
-                      <th style={{padding:'1.2mm 1mm', textAlign:'left'}}>Item Description</th>
-                      <th style={{padding:'1.2mm 1mm', width:'10mm', textAlign:'center'}}>Size</th>
+                      <th style={{padding:'1.5mm 1mm', textAlign:'center', borderRadius:'1mm 0 0 1mm'}}>#</th>
+                      <th style={{padding:'1.5mm 1mm', textAlign:'left'}}>Item Description</th>
+                      <th style={{padding:'1.5mm 1mm', textAlign:'center'}}>Size</th>
                       {/* PRICE HIGHLIGHTED */}
-                      <th style={{padding:'1.2mm 1mm', width:'14mm', textAlign:'right', background:'#7c2d12', color:'#fef3c7'}}>Rate</th>
-                      <th style={{padding:'1.2mm 1mm', width:'6mm', textAlign:'center'}}>Qty</th>
-                      <th style={{padding:'1.2mm 1mm', width:'16mm', textAlign:'right', borderRadius:'0 1mm 1mm 0'}}>Amount</th>
+                      <th style={{padding:'1.5mm 1mm', textAlign:'right', background:'#7c2d12', color:'#fef3c7'}}>Rate</th>
+                      <th style={{padding:'1.5mm 1mm', textAlign:'center'}}>Qty</th>
+                      <th style={{padding:'1.5mm 1mm', textAlign:'right', borderRadius:'0 1mm 1mm 0'}}>Amount</th>
                     </tr>
                   </thead>
                   <tbody>
                     {activePrintBill.items?.map((item: any, idx: number) => (
                       <tr key={idx} style={{borderBottom:'0.5px solid #fde68a', background: idx % 2 === 0 ? '#fff' : '#fffbeb'}}>
-                        <td style={{padding:'1mm', textAlign:'center', color:'#92400e', fontWeight:'700'}}>{idx + 1}</td>
-                        <td style={{padding:'1mm', fontWeight:'700', color:'#1c1917'}}>{item.name}</td>
-                        <td style={{padding:'1mm', textAlign:'center', color:'#78350f'}}>{item.size || '—'}</td>
+                        <td style={{padding:'1.5mm 1mm', textAlign:'center', color:'#92400e', fontWeight:'700'}}>{idx + 1}</td>
+                        <td style={{padding:'1.5mm 1mm', fontWeight:'700', color:'#1c1917', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{item.name}</td>
+                        <td style={{padding:'1.5mm 1mm', textAlign:'center', color:'#78350f'}}>{item.size || '—'}</td>
                         {/* PRICE CELL HIGHLIGHTED */}
-                        <td style={{padding:'1mm', textAlign:'right', fontWeight:'800', color:'#92400e', background:'#fef9ee'}}>
+                        <td style={{padding:'1.5mm 1mm', textAlign:'right', fontWeight:'800', color:'#92400e', background:'#fef9ee', whiteSpace:'nowrap'}}>
                           ₹{Number(item.price).toLocaleString('en-IN', {minimumFractionDigits:2})}
                         </td>
-                        <td style={{padding:'1mm', textAlign:'center', fontWeight:'800', color:'#1c1917'}}>{item.quantity}</td>
-                        <td style={{padding:'1mm', textAlign:'right', fontWeight:'800', color:'#1c1917'}}>
+                        <td style={{padding:'1.5mm 1mm', textAlign:'center', fontWeight:'800', color:'#1c1917'}}>{item.quantity}</td>
+                        <td style={{padding:'1.5mm 1mm', textAlign:'right', fontWeight:'800', color:'#1c1917', whiteSpace:'nowrap'}}>
                           ₹{(Number(item.price) * Number(item.quantity)).toLocaleString('en-IN', {minimumFractionDigits:2})}
                         </td>
                       </tr>
@@ -5001,48 +5011,48 @@ export default function AdminDashboard() {
                 </table>
               </div>
 
-              {/* ── TOTALS ── */}
-              <div style={{borderTop:'1.5px solid #451a03', paddingTop:'1mm', marginTop:'0.5mm', display:'flex', justifyContent:'flex-end'}}>
-                <div style={{width:'55%', fontSize:`${baseFontPx * 0.9}px`}}>
-                  <div style={{display:'flex', justifyContent:'space-between', padding:'0.3mm 0', color:'#78350f'}}>
+              {/* ── TOTALS – full width right-aligned ── */}
+              <div style={{borderTop:'1.5px solid #451a03', paddingTop:'1mm', marginTop:'0.5mm'}}>
+                <div style={{marginLeft:'auto', width:'60%', fontSize:`${baseFontPx * 0.9}px`}}>
+                  <div style={{display:'flex', justifyContent:'space-between', padding:'0.4mm 0', color:'#78350f'}}>
                     <span>Subtotal:</span>
-                    <span style={{fontWeight:'700'}}>₹{Number(activePrintBill.subtotal).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                    <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>₹{Number(activePrintBill.subtotal).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
                   </div>
                   {Number(activePrintBill.discount) > 0 && (
-                    <div style={{display:'flex', justifyContent:'space-between', padding:'0.3mm 0', color:'#15803d'}}>
+                    <div style={{display:'flex', justifyContent:'space-between', padding:'0.4mm 0', color:'#15803d'}}>
                       <span>Discount:</span>
-                      <span style={{fontWeight:'700'}}>-₹{Number(activePrintBill.discount).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                      <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>-₹{Number(activePrintBill.discount).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
                     </div>
                   )}
                   {billShowGst && Number(activePrintBill.cgst) > 0 && (
-                    <div style={{display:'flex', justifyContent:'space-between', padding:'0.3mm 0', color:'#78350f'}}>
+                    <div style={{display:'flex', justifyContent:'space-between', padding:'0.4mm 0', color:'#78350f'}}>
                       <span>CGST:</span>
-                      <span style={{fontWeight:'700'}}>₹{Number(activePrintBill.cgst).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                      <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>₹{Number(activePrintBill.cgst).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
                     </div>
                   )}
                   {billShowGst && Number(activePrintBill.sgst) > 0 && (
-                    <div style={{display:'flex', justifyContent:'space-between', padding:'0.3mm 0', color:'#78350f'}}>
+                    <div style={{display:'flex', justifyContent:'space-between', padding:'0.4mm 0', color:'#78350f'}}>
                       <span>SGST:</span>
-                      <span style={{fontWeight:'700'}}>₹{Number(activePrintBill.sgst).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                      <span style={{fontWeight:'700', whiteSpace:'nowrap'}}>₹{Number(activePrintBill.sgst).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
                     </div>
                   )}
                   {/* GRAND TOTAL – BIG HIGHLIGHT */}
-                  <div style={{display:'flex', justifyContent:'space-between', padding:'1.5mm 2mm', marginTop:'1mm', background:'#451a03', color:'white', borderRadius:'1mm', fontWeight:'900', fontSize:`${baseFontPx * 1.2}px`}}>
+                  <div style={{display:'flex', justifyContent:'space-between', padding:'1.5mm 2mm', marginTop:'0.8mm', background:'#451a03', color:'white', borderRadius:'1mm', fontWeight:'900', fontSize:`${baseFontPx * 1.15}px`, whiteSpace:'nowrap'}}>
                     <span>GRAND TOTAL</span>
                     <span>₹{Number(activePrintBill.total).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
                   </div>
-                  <div style={{display:'flex', justifyContent:'space-between', padding:'0.3mm 0', color:'#15803d', fontWeight:'700', marginTop:'0.5mm'}}>
+                  <div style={{display:'flex', justifyContent:'space-between', padding:'0.4mm 0', color:'#15803d', fontWeight:'700', marginTop:'0.3mm'}}>
                     <span>Amount Paid:</span>
-                    <span>₹{Number(activePrintBill.amountPaid).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                    <span style={{whiteSpace:'nowrap'}}>₹{Number(activePrintBill.amountPaid).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
                   </div>
                   {Number(activePrintBill.amountDue) > 0 && (
-                    <div style={{display:'flex', justifyContent:'space-between', padding:'0.3mm 0', color:'#be123c', fontWeight:'900'}}>
+                    <div style={{display:'flex', justifyContent:'space-between', padding:'0.4mm 0', color:'#be123c', fontWeight:'900'}}>
                       <span>Balance Due:</span>
-                      <span>₹{Number(activePrintBill.amountDue).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                      <span style={{whiteSpace:'nowrap'}}>₹{Number(activePrintBill.amountDue).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
                     </div>
                   )}
                   {billShowAmountWords && (
-                    <div style={{marginTop:'0.8mm', fontSize:`${baseFontPx * 0.8}px`, color:'#92400e', fontStyle:'italic', fontWeight:'600'}}>
+                    <div style={{marginTop:'0.8mm', fontSize:`${baseFontPx * 0.75}px`, color:'#92400e', fontStyle:'italic', fontWeight:'600'}}>
                       {numberToWords(Number(activePrintBill.total) || 0)}
                     </div>
                   )}
@@ -5054,7 +5064,7 @@ export default function AdminDashboard() {
                 <>
                   {/* Bank details */}
                   {showBankDetails && bankName && (
-                    <div style={{borderTop:'0.5px dashed #fde68a', paddingTop:'1mm', marginTop:'0.5mm', fontSize:`${baseFontPx * 0.85}px`}}>
+                    <div style={{borderTop:'0.5px dashed #fde68a', paddingTop:'1mm', marginTop:'0.5mm', fontSize:`${baseFontPx * 0.8}px`}}>
                       <div style={{fontWeight:'800', color:'#92400e', marginBottom:'0.3mm'}}>Bank Details:</div>
                       <div style={{color:'#78350f'}}>Bank: {bankName} &nbsp;|&nbsp; A/c: {bankAccount} &nbsp;|&nbsp; IFSC: {bankIfsc}</div>
                     </div>
@@ -5062,28 +5072,21 @@ export default function AdminDashboard() {
 
                   {/* Terms & Extra Note */}
                   {(billTermsText || billExtraNote) && (
-                    <div style={{borderTop:'0.5px dashed #fde68a', paddingTop:'1mm', marginTop:'0.5mm', fontSize:`${baseFontPx * 0.8}px`, color:'#78350f'}}>
+                    <div style={{borderTop:'0.5px dashed #fde68a', paddingTop:'0.8mm', marginTop:'0.5mm', fontSize:`${baseFontPx * 0.75}px`, color:'#78350f'}}>
                       {billTermsText && <div><span style={{fontWeight:'800'}}>Terms: </span>{billTermsText}</div>}
                       {billExtraNote && <div style={{marginTop:'0.3mm'}}><span style={{fontWeight:'800'}}>Note: </span>{billExtraNote}</div>}
                     </div>
                   )}
 
-                  {/* Footer Banner */}
-                  {billFooterMsg && (
-                    <div style={{textAlign:'center', background:'#451a03', color:'white', padding:'1mm 2mm', borderRadius:'1mm', fontWeight:'900', fontSize:`${baseFontPx * 0.9}px`, letterSpacing:'1px', textTransform:'uppercase', marginTop:'0.5mm'}}>
-                      {billFooterMsg}
-                    </div>
-                  )}
-
                   {/* Signatures */}
                   {billShowSignature && (
-                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', paddingTop:'4mm', fontSize:`${baseFontPx * 0.85}px`, fontWeight:'700', color:'#92400e'}}>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', paddingTop:'3mm', fontSize:`${baseFontPx * 0.8}px`, fontWeight:'700', color:'#92400e'}}>
                       <div style={{textAlign:'center'}}>
                         <div style={{borderBottom:'1px solid #d97706', width:'28mm', marginBottom:'0.5mm'}}></div>
                         <div>Customer's Signature</div>
                       </div>
                       <div style={{textAlign:'center'}}>
-                        <div style={{fontSize:`${baseFontPx * 0.75}px`, color:'#a16207', marginBottom:'4mm', textTransform:'uppercase'}}>for {businessName}</div>
+                        <div style={{fontSize:`${baseFontPx * 0.7}px`, color:'#a16207', marginBottom:'3mm', textTransform:'uppercase'}}>for {businessName}</div>
                         <div style={{borderBottom:'1px solid #d97706', width:'28mm', marginBottom:'0.5mm'}}></div>
                         <div>Authorised Signatory</div>
                       </div>
@@ -5092,9 +5095,9 @@ export default function AdminDashboard() {
                 </>
               )}
 
-              {/* When compact: just show thank you */}
-              {isCompact && billFooterMsg && (
-                <div style={{textAlign:'center', background:'#451a03', color:'white', padding:'0.8mm 2mm', borderRadius:'1mm', fontWeight:'900', fontSize:`${baseFontPx * 0.85}px`, letterSpacing:'1px', textTransform:'uppercase', marginTop:'0.5mm'}}>
+              {/* Footer Banner – always show (both compact and normal) */}
+              {billFooterMsg && (
+                <div style={{textAlign:'center', background:'#451a03', color:'white', padding:'1mm 2mm', borderRadius:'1mm', fontWeight:'900', fontSize:`${baseFontPx * 0.85}px`, letterSpacing:'1px', textTransform:'uppercase', marginTop:'auto'}}>
                   {billFooterMsg}
                 </div>
               )}
