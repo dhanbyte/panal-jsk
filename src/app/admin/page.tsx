@@ -3607,14 +3607,28 @@ export default function AdminDashboard() {
                         <input
                           type="file"
                           accept="image/*"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              const reader = new FileReader();
-                              reader.onloadend = () => {
-                                setBusinessLogo(reader.result as string);
-                              };
-                              reader.readAsDataURL(file);
+                              // Upload via ImageKit for CDN URL (avoids Firestore 1MB limit)
+                              const formData = new FormData();
+                              formData.append("file", file);
+                              try {
+                                const res = await fetch("/api/upload", { method: "POST", body: formData });
+                                if (res.ok) {
+                                  const data = await res.json();
+                                  setBusinessLogo(data.url);
+                                } else {
+                                  // Fallback: use base64 if upload fails
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => setBusinessLogo(reader.result as string);
+                                  reader.readAsDataURL(file);
+                                }
+                              } catch {
+                                const reader = new FileReader();
+                                reader.onloadend = () => setBusinessLogo(reader.result as string);
+                                reader.readAsDataURL(file);
+                              }
                             }
                           }}
                           className="w-full text-xs text-amber-900 file:mr-4 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-amber-100 file:text-amber-950 hover:file:bg-amber-200 cursor-pointer"
@@ -4038,12 +4052,14 @@ export default function AdminDashboard() {
                         <div className="font-bold text-amber-900">Remarks:</div>
                         <div className="text-amber-950/60 leading-tight mt-0.5 max-w-[180px]">{customRemark || "No E-Way Bill is required."}</div>
                       </div>
-                      <div className="bg-amber-50/30 p-2 rounded border border-amber-100/50">
-                        <div className="font-bold text-amber-900 mb-0.5">Company Bank Details:</div>
-                        <div>Bank: {bankName}</div>
-                        <div>A/c No: {bankAccount}</div>
-                        <div>IFSC: {bankIfsc}</div>
-                      </div>
+                      {showBankDetails && (
+                        <div className="bg-amber-50/30 p-2 rounded border border-amber-100/50">
+                          <div className="font-bold text-amber-900 mb-0.5">Company Bank Details:</div>
+                          <div>Bank: {bankName}</div>
+                          <div>A/c No: {bankAccount}</div>
+                          <div>IFSC: {bankIfsc}</div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Footer Signatures */}
@@ -4875,14 +4891,15 @@ export default function AdminDashboard() {
 
       {/* Printable Custom Bill Area (GST Tax Invoice - Strict Single Page Fit) */}
       {printMode === "a4-bill" && activePrintBill && (
-        <div id="printable-a4-bill-area" className="bg-white">
+        <div id="printable-a4-bill-area" style={{margin: 0, padding: 0}}>
           <div 
-            className="bg-white p-[2mm] leading-tight font-sans text-amber-950 flex flex-col justify-between box-border mx-auto overflow-hidden shrink-0" 
+            className="bg-white p-[2mm] leading-tight font-sans text-amber-950 flex flex-col justify-between box-border overflow-hidden shrink-0" 
             style={{
               width: `${billPageWidth}mm`,
               maxWidth: `${billPageWidth}mm`,
               height: `${billPageHeight}mm`,
               maxHeight: `${billPageHeight}mm`,
+              margin: 0,
               fontSize: billFontSize === 'small' ? '6px' : billFontSize === 'large' ? '9px' : billFontSize === 'xlarge' ? '10px' : '7.5px'
             }}
           >
@@ -5048,6 +5065,14 @@ export default function AdminDashboard() {
             {/* Bank Details & remarks */}
             <div className="flex flex-col gap-1 border-t-2 border-amber-200 pt-1 mt-1 text-[0.8em] leading-relaxed shrink-0">
               <div className="space-y-1">
+                {showBankDetails && bankName && (
+                  <div className="bg-amber-50/30 p-1.5 rounded border border-amber-100/50">
+                    <div className="font-bold text-amber-900 mb-0.5">Company Bank Details:</div>
+                    <div>Bank: {bankName}</div>
+                    <div>A/c No: {bankAccount}</div>
+                    <div>IFSC: {bankIfsc}</div>
+                  </div>
+                )}
                 {billTermsText && (
                   <div>
                     <div className="font-bold text-amber-900 mb-0.5">Terms & Conditions:</div>
