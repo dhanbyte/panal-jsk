@@ -230,6 +230,8 @@ export default function AdminDashboard() {
   const [isDraggingImage, setIsDraggingImage] = useState(false);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [productSubmitLoading, setProductSubmitLoading] = useState(false);
+  const [csvImportLoading, setCsvImportLoading] = useState(false);
+  const csvImportRef = React.useRef<HTMLInputElement>(null);
 
   // Billing State
   const [customerName, setCustomerName] = useState("");
@@ -1043,59 +1045,25 @@ export default function AdminDashboard() {
       const creditVal = Number(amountPaidCredit) || due;
       const totalPaid = cashVal + upiVal;
       const saveOnly = actionType === 'save-only';
-      // 1. Immediately trigger A6 or thermal print if printing is requested
-      if (actionType === 'print-thermal' || actionType === 'print-a4') {
-        const billToPrint = {
-          billNo,
-          customerName: finalCustomerName,
-          customerPhone: finalCustomerPhone,
-          items: [...billItems],
-          subtotal,
-          discount: calculatedDiscount,
-          cgst,
-          sgst,
-          igst,
-          cgstRate: Number(billCgst) || 1.5,
-          sgstRate: Number(billSgst) || 1.5,
-          igstRate: Number(billIgst) || 0,
-          total,
-          amountPaid: totalPaid,
-          amountDue: due,
-          paymentStatus,
-          paymentMethod: paymentMethod === "Split" ? "Split" : paymentMethod,
-          createdAt: { seconds: Date.now() / 1000 }
-        };
-        setActivePrintBill(billToPrint);
-        
-        if (actionType === 'print-a4') {
-          setPrintMode("a4-bill");
-          document.body.classList.add("print-mode-a4-bill");
-          setTimeout(() => {
-            // Inject dynamic @page size so printer gets exact paper dimensions
-            const dynStyle = document.createElement('style');
-            dynStyle.id = '__jsk_dynamic_page_size__';
-            dynStyle.textContent = `@media print { @page { size: ${billPageWidth}mm ${billPageHeight}mm; margin: 0mm !important; } * { -webkit-text-size-adjust: none !important; text-size-adjust: none !important; } html, body { width: ${billPageWidth}mm !important; height: ${billPageHeight}mm !important; margin: 0 !important; padding: 0 !important; overflow: hidden !important; } }`;
-            document.head.appendChild(dynStyle);
-            window.print();
-            setTimeout(() => {
-              document.body.classList.remove("print-mode-a4-bill");
-              const s = document.getElementById('__jsk_dynamic_page_size__');
-              if (s) s.remove();
-            }, 1000);
-          }, 400);
-        } else {
-          setPrintMode("bill");
-          document.body.classList.add("print-mode-bill");
-          setTimeout(() => {
-            window.print();
-            setTimeout(() => {
-              document.body.classList.remove("print-mode-bill");
-            }, 1000);
-          }, 350);
-        }
-      }
 
-      // 2. Define background save and upload worker
+      // Capture all bill values into local consts BEFORE any async/state changes
+      const capturedBillItems = [...billItems];
+      const capturedSubtotal = subtotal;
+      const capturedDiscount = calculatedDiscount;
+      const capturedCgst = cgst;
+      const capturedSgst = sgst;
+      const capturedIgst = igst;
+      const capturedTotal = total;
+      const capturedTotalCost = totalCost;
+      const capturedDue = due;
+      const capturedPaymentStatus = paymentStatus;
+      const capturedPaymentMethod = paymentMethod;
+      const capturedDueDate = dueDate;
+      const capturedBillCgst = billCgst;
+      const capturedBillSgst = billSgst;
+      const capturedBillIgst = billIgst;
+
+      // 1. Define save worker — uses captured values, not live state
       const runBackgroundSave = async () => {
         let finalDownloadUrl = "";
 
@@ -1107,20 +1075,20 @@ export default function AdminDashboard() {
             // Draw Watermark
             docPdf.setFont("helvetica", "bold");
             docPdf.setFontSize(80);
-            docPdf.setTextColor(242, 238, 230); // Very light gold/gray watermark
+            docPdf.setTextColor(242, 238, 230);
             docPdf.text("JSK", 105, 150, { angle: 45, align: "center" });
             
             // Draw Logo
             const drawDiamondLogo = () => {
-              docPdf.setDrawColor(180, 140, 60); // Gold tone
+              docPdf.setDrawColor(180, 140, 60);
               docPdf.setLineWidth(0.5);
-              docPdf.line(22, 11, 32, 11); // top horizontal
-              docPdf.line(22, 11, 17, 17); // top left diagonal
-              docPdf.line(32, 11, 37, 17); // top right diagonal
-              docPdf.line(17, 17, 27, 27); // bottom left diagonal
-              docPdf.line(37, 17, 27, 27); // bottom right diagonal
-              docPdf.line(17, 17, 37, 17); // middle horizontal
-              docPdf.line(27, 11, 27, 27); // vertical center
+              docPdf.line(22, 11, 32, 11);
+              docPdf.line(22, 11, 17, 17);
+              docPdf.line(32, 11, 37, 17);
+              docPdf.line(17, 17, 27, 27);
+              docPdf.line(37, 17, 27, 27);
+              docPdf.line(17, 17, 37, 17);
+              docPdf.line(27, 11, 27, 27);
             };
             
             if (businessLogo) {
@@ -1134,7 +1102,6 @@ export default function AdminDashboard() {
               drawDiamondLogo();
             }
             
-            // Brand Title
             docPdf.setFont("helvetica", "bold");
             docPdf.setFontSize(20);
             docPdf.setTextColor(44, 38, 32);
@@ -1145,11 +1112,9 @@ export default function AdminDashboard() {
             docPdf.setTextColor(180, 140, 60);
             docPdf.text(businessSub, 43, 24);
 
-            // Gold band decoration
             docPdf.setFillColor(180, 140, 60);
             docPdf.rect(14, 29, 182, 3, "F");
 
-            // Document Type Title
             docPdf.setFont("helvetica", "bold");
             docPdf.setFontSize(11);
             docPdf.setTextColor(40, 40, 40);
@@ -1159,7 +1124,6 @@ export default function AdminDashboard() {
             docPdf.setTextColor(120, 120, 120);
             docPdf.text("(ORIGINAL FOR RECIPIENT)", 84, 43);
 
-            // --- SUPPLIER & INVOICE DETAILS ---
             docPdf.setFont("helvetica", "bold");
             docPdf.setFontSize(8.5);
             docPdf.setTextColor(40, 40, 40);
@@ -1179,7 +1143,6 @@ export default function AdminDashboard() {
               docPdf.text(`Instagram: ${businessInstagram}`, 14, 65 + addrHeight);
             }
 
-            // Invoice Details
             docPdf.setFont("helvetica", "bold");
             docPdf.text("Invoice No.", 120, 51);
             docPdf.text("Dated", 160, 51);
@@ -1192,11 +1155,9 @@ export default function AdminDashboard() {
             docPdf.setFont("helvetica", "normal");
             docPdf.text("At Chennai", 120, 68);
 
-            // Divider
             docPdf.setDrawColor(220, 220, 220);
             docPdf.line(14, 76, 196, 76);
 
-            // --- BUYER DETAILS ---
             docPdf.setFont("helvetica", "bold");
             docPdf.text("BUYER (CUSTOMER)", 14, 82);
             docPdf.setFont("helvetica", "normal");
@@ -1204,8 +1165,8 @@ export default function AdminDashboard() {
             docPdf.text(`Mobile: ${finalCustomerPhone}`, 14, 91);
             docPdf.text("State Name: Tamil Nadu, Code: 33", 14, 95);
 
-            // --- ITEMS TABLE ---
-            const tableData = billItems.map((item, index) => [
+            // --- ITEMS TABLE (use capturedBillItems) ---
+            const tableData = capturedBillItems.map((item, index) => [
               index + 1,
               item.name,
               item.productId ? (products.find(p => p.id === item.productId)?.size || "-") : "-",
@@ -1233,56 +1194,51 @@ export default function AdminDashboard() {
 
             const finalY = (docPdf as any).lastAutoTable.finalY + 8;
 
-            // --- TAXATION SUMMARY ---
             docPdf.setFont("helvetica", "normal");
             docPdf.setFontSize(7.5);
             docPdf.setTextColor(80, 80, 80);
             
             docPdf.text(`Subtotal:`, 125, finalY);
-            docPdf.text(`Rs. ${subtotal.toLocaleString("en-IN")}`, 196, finalY, { align: "right" });
+            docPdf.text(`Rs. ${capturedSubtotal.toLocaleString("en-IN")}`, 196, finalY, { align: "right" });
             
-            docPdf.text(`Output CGST @ ${billCgst}%:`, 125, finalY + 4);
-            docPdf.text(`Rs. ${cgst.toLocaleString("en-IN")}`, 196, finalY + 4, { align: "right" });
+            docPdf.text(`Output CGST @ ${capturedBillCgst}%:`, 125, finalY + 4);
+            docPdf.text(`Rs. ${capturedCgst.toLocaleString("en-IN")}`, 196, finalY + 4, { align: "right" });
             
-            docPdf.text(`Output SGST @ ${billSgst}%:`, 125, finalY + 8);
-            docPdf.text(`Rs. ${sgst.toLocaleString("en-IN")}`, 196, finalY + 8, { align: "right" });
+            docPdf.text(`Output SGST @ ${capturedBillSgst}%:`, 125, finalY + 8);
+            docPdf.text(`Rs. ${capturedSgst.toLocaleString("en-IN")}`, 196, finalY + 8, { align: "right" });
             
-            if (igst > 0) {
-              docPdf.text(`Output IGST @ ${billIgst}%:`, 125, finalY + 12);
-              docPdf.text(`Rs. ${igst.toLocaleString("en-IN")}`, 196, finalY + 12, { align: "right" });
+            if (capturedIgst > 0) {
+              docPdf.text(`Output IGST @ ${capturedBillIgst}%:`, 125, finalY + 12);
+              docPdf.text(`Rs. ${capturedIgst.toLocaleString("en-IN")}`, 196, finalY + 12, { align: "right" });
             }
 
-            const discountY = finalY + 12 + (igst > 0 ? 4 : 0);
+            const discountY = finalY + 12 + (capturedIgst > 0 ? 4 : 0);
             docPdf.text(`Discount & Rounding:`, 125, discountY);
-            docPdf.text(`- Rs. ${calculatedDiscount.toLocaleString("en-IN")}`, 196, discountY, { align: "right" });
+            docPdf.text(`- Rs. ${capturedDiscount.toLocaleString("en-IN")}`, 196, discountY, { align: "right" });
 
             const totalY = discountY + 6;
             docPdf.setFont("helvetica", "bold");
             docPdf.setTextColor(44, 38, 32);
             docPdf.text(`Grand Total:`, 125, totalY);
-            docPdf.text(`Rs. ${total.toLocaleString("en-IN")}`, 196, totalY, { align: "right" });
+            docPdf.text(`Rs. ${capturedTotal.toLocaleString("en-IN")}`, 196, totalY, { align: "right" });
 
-            // Amount in Words Box
             docPdf.setFont("helvetica", "bold");
             docPdf.setFontSize(7.5);
             docPdf.text("Amount Chargeable (in words):", 14, finalY);
             docPdf.setFont("helvetica", "normal");
-            const wordsLines = docPdf.splitTextToSize(numberToWords(total), 100);
+            const wordsLines = docPdf.splitTextToSize(numberToWords(capturedTotal), 100);
             docPdf.text(wordsLines, 14, finalY + 4);
 
-            // Tax Amount in Words Box
-            const totalTaxAmount = cgst + sgst + igst;
+            const totalTaxAmount = capturedCgst + capturedSgst + capturedIgst;
             docPdf.setFont("helvetica", "bold");
             docPdf.text("Tax Amount (in words):", 14, finalY + 14);
             docPdf.setFont("helvetica", "normal");
             const taxWordsLines = docPdf.splitTextToSize(numberToWords(totalTaxAmount), 100);
             docPdf.text(taxWordsLines, 14, finalY + 18);
 
-            // Divider separator
             docPdf.setDrawColor(200, 200, 200);
             docPdf.line(14, totalY + 8, 196, totalY + 8);
 
-            // --- REMARKS & BANK DETAILS ---
             const footerY = totalY + 13;
             docPdf.setFont("helvetica", "bold");
             docPdf.text("Remarks:", 14, footerY);
@@ -1292,7 +1248,6 @@ export default function AdminDashboard() {
             const remarksText = docPdf.splitTextToSize(customRemark || "No E-Way Bill is required.", 70);
             docPdf.text(remarksText, 14, footerY + 3);
 
-            // Bank Details or WhatsApp QR Code
             if (showBankDetails) {
               docPdf.setFont("helvetica", "bold");
               docPdf.setFontSize(7.5);
@@ -1315,60 +1270,57 @@ export default function AdminDashboard() {
               }
             }
 
-            // Signatures
             docPdf.setFont("helvetica", "bold");
             docPdf.text(`for ${businessName}`, 150, footerY);
             docPdf.setFont("helvetica", "normal");
             docPdf.setFontSize(6.5);
             docPdf.text("Authorised Signatory", 153, footerY + 16);
-            
             docPdf.text("Customer's Seal and Signature", 14, footerY + 16);
-
             docPdf.setDrawColor(180, 180, 180);
-            docPdf.line(150, footerY + 12, 190, footerY + 12); // Auth line
-            docPdf.line(14, footerY + 12, 60, footerY + 12); // Cust line
+            docPdf.line(150, footerY + 12, 190, footerY + 12);
+            docPdf.line(14, footerY + 12, 60, footerY + 12);
 
             const pdfBlob = docPdf.output("blob");
             const pdfRef = ref(storage, `invoices/${billNo}.pdf`);
             const uploadResult = await uploadBytes(pdfRef, pdfBlob);
             finalDownloadUrl = await getDownloadURL(uploadResult.ref);
           } catch (pdfErr) {
-            console.error("Background PDF generation/upload failed:", pdfErr);
+            console.error("PDF generation/upload failed (bill will still be saved):", pdfErr);
           }
         }
 
-        // b. Save Invoice to Firestore
+        // b. Save Invoice to Firestore — always runs, uses captured values
         const billPayload: any = {
           billNo,
           customerName: finalCustomerName,
           customerPhone: finalCustomerPhone,
-          items: billItems,
-          subtotal,
-          discount: calculatedDiscount,
-          cgst,
-          sgst,
-          igst,
-          cgstRate: Number(billCgst) || 1.5,
-          sgstRate: Number(billSgst) || 1.5,
-          igstRate: Number(billIgst) || 0,
-          total,
-          totalCost,
-          paymentStatus,
-          paymentMethod: paymentMethod === "Split" ? "Split" : paymentMethod,
+          items: capturedBillItems,
+          subtotal: capturedSubtotal,
+          discount: capturedDiscount,
+          cgst: capturedCgst,
+          sgst: capturedSgst,
+          igst: capturedIgst,
+          cgstRate: Number(capturedBillCgst) || 1.5,
+          sgstRate: Number(capturedBillSgst) || 1.5,
+          igstRate: Number(capturedBillIgst) || 0,
+          total: capturedTotal,
+          totalCost: capturedTotalCost,
+          paymentStatus: capturedPaymentStatus,
+          paymentMethod: capturedPaymentMethod === "Split" ? "Split" : capturedPaymentMethod,
           amountPaid: totalPaid,
           amountPaidCash: cashVal,
           amountPaidUPI: upiVal,
           amountPaidCredit: creditVal,
-          amountDue: due,
-          dueDate: dueDate || "",
+          amountDue: capturedDue,
+          dueDate: capturedDueDate || "",
           pdfUrl: finalDownloadUrl,
           createdAt: serverTimestamp()
         };
 
         await addDoc(collection(db, "bills"), billPayload);
 
-        // c. Update product stocks and sold counts locally/database
-        for (const item of billItems) {
+        // c. Update product stocks and sold counts
+        for (const item of capturedBillItems) {
           let matchingProd = null;
           if (item.productId) {
             matchingProd = products.find(p => p.id === item.productId);
@@ -1386,22 +1338,72 @@ export default function AdminDashboard() {
           }
         }
 
-        // d. Sync data from database
+        // d. Sync data
         fetchData();
-
       };
 
       // 3. Handle action flows
       if (actionType === 'whatsapp') {
-        const shareText = `*JSK Art Jewellery Invoice*\n\nDear *${finalCustomerName}*,\nThank you for shopping with us.\n\n*Invoice No:* ${billNo}\n*Grand Total:* ₹${total.toLocaleString("en-IN")}\n*Amount Paid:* ₹${totalPaid.toLocaleString("en-IN")}\n*Amount Due:* ₹${due.toLocaleString("en-IN")}\n*Status:* ${paymentStatus}`;
+        const shareText = `*JSK Art Jewellery Invoice*\n\nDear *${finalCustomerName}*,\nThank you for shopping with us.\n\n*Invoice No:* ${billNo}\n*Grand Total:* ₹${capturedTotal.toLocaleString("en-IN")}\n*Amount Paid:* ₹${totalPaid.toLocaleString("en-IN")}\n*Amount Due:* ₹${capturedDue.toLocaleString("en-IN")}\n*Status:* ${capturedPaymentStatus}`;
         const waUrl = `https://wa.me/91${finalCustomerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(shareText)}`;
         window.open(waUrl, "_blank");
       }
 
-      // Run save operation in background asynchronously
-      runBackgroundSave().catch(console.error);
+      // 2. SAVE FIRST — await so Firestore is always written before form resets
+      await runBackgroundSave();
 
-      // Reset Billing form immediately so the screen is available instantly
+      // 3. THEN trigger print (after save is confirmed in Firestore)
+      if (actionType === 'print-thermal' || actionType === 'print-a4') {
+        const billToPrint = {
+          billNo,
+          customerName: finalCustomerName,
+          customerPhone: finalCustomerPhone,
+          items: capturedBillItems,
+          subtotal: capturedSubtotal,
+          discount: capturedDiscount,
+          cgst: capturedCgst,
+          sgst: capturedSgst,
+          igst: capturedIgst,
+          cgstRate: Number(capturedBillCgst) || 1.5,
+          sgstRate: Number(capturedBillSgst) || 1.5,
+          igstRate: Number(capturedBillIgst) || 0,
+          total: capturedTotal,
+          amountPaid: totalPaid,
+          amountDue: capturedDue,
+          paymentStatus: capturedPaymentStatus,
+          paymentMethod: capturedPaymentMethod === "Split" ? "Split" : capturedPaymentMethod,
+          createdAt: { seconds: Date.now() / 1000 }
+        };
+        setActivePrintBill(billToPrint);
+
+        if (actionType === 'print-a4') {
+          setPrintMode("a4-bill");
+          document.body.classList.add("print-mode-a4-bill");
+          setTimeout(() => {
+            const dynStyle = document.createElement('style');
+            dynStyle.id = '__jsk_dynamic_page_size__';
+            dynStyle.textContent = `@media print { @page { size: ${billPageWidth}mm ${billPageHeight}mm; margin: 0mm !important; } * { -webkit-text-size-adjust: none !important; text-size-adjust: none !important; } html, body { width: ${billPageWidth}mm !important; height: ${billPageHeight}mm !important; margin: 0 !important; padding: 0 !important; overflow: hidden !important; } }`;
+            document.head.appendChild(dynStyle);
+            window.print();
+            setTimeout(() => {
+              document.body.classList.remove("print-mode-a4-bill");
+              const s = document.getElementById('__jsk_dynamic_page_size__');
+              if (s) s.remove();
+            }, 1000);
+          }, 400);
+        } else {
+          setPrintMode("bill");
+          document.body.classList.add("print-mode-bill");
+          setTimeout(() => {
+            window.print();
+            setTimeout(() => {
+              document.body.classList.remove("print-mode-bill");
+            }, 1000);
+          }, 350);
+        }
+      }
+
+      // 4. Reset form AFTER save is confirmed
       setCustomerName("");
       setCustomerPhone("");
       setBillItems([{ productId: "", name: "", price: 0, quantity: 1, purchasePrice: 0, cgstRate: defaultGst.cgst, sgstRate: defaultGst.sgst, igstRate: defaultGst.igst }]);
@@ -1415,10 +1417,10 @@ export default function AdminDashboard() {
       setAmountPaidCredit("0");
       setDueDate("");
       setPaymentMethod("Cash");
-      setBillingSubmitLoading(false);
     } catch (err) {
       console.error(err);
       alert("Failed to create bill: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
       setBillingSubmitLoading(false);
     }
   };
@@ -1603,6 +1605,150 @@ export default function AdminDashboard() {
 
   const handleRemoveCategory = (catToRemove: string) => {
     setCustomCategories(customCategories.filter(cat => cat !== catToRemove));
+  };
+
+  // ─── CSV Export: Download all products as backup CSV ───
+  const handleExportProductsCSV = () => {
+    const headers = [
+      "barcode", "name", "category", "price", "discountPrice", "purchasePrice",
+      "stock", "lowStockThreshold", "cgst", "sgst", "igst",
+      "size", "description", "videoUrl", "imageUrls"
+    ];
+    const escape = (val: any) => {
+      if (val === null || val === undefined) return "";
+      const s = String(val).replace(/"/g, '""');
+      return /[,"\n\r]/.test(s) ? `"${s}"` : s;
+    };
+    const rows = products.map(p => [
+      escape(p.barcode),
+      escape(p.name),
+      escape(p.category),
+      escape(p.price),
+      escape(p.discountPrice ?? ""),
+      escape(p.purchasePrice ?? ""),
+      escape(p.stock),
+      escape(p.lowStockThreshold ?? 5),
+      escape(p.cgst ?? ""),
+      escape(p.sgst ?? ""),
+      escape(p.igst ?? ""),
+      escape(p.size ?? ""),
+      escape(p.description),
+      escape(p.videoUrl ?? ""),
+      escape((p.imageUrls || []).join("|"))
+    ].join(","));
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `JSK_Products_Backup_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // ─── CSV Import: Restore products from backup CSV ───
+  const handleImportProductsCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset so the same file can be re-selected if needed
+    e.target.value = "";
+
+    if (!confirm(`CSV se products import karna chahte ho?\n\nYe existing products ko UPDATE karega (barcode se match karke) aur naye products ADD karega. Delete nahi karega.`)) return;
+
+    setCsvImportLoading(true);
+    try {
+      const text = await file.text();
+      // Remove BOM if present
+      const cleaned = text.startsWith("\uFEFF") ? text.slice(1) : text;
+      const lines = cleaned.split(/\r?\n/).filter(l => l.trim() !== "");
+      if (lines.length < 2) throw new Error("CSV mein koi data nahi mila.");
+
+      const parseRow = (line: string): string[] => {
+        const result: string[] = [];
+        let cur = "";
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (inQuotes) {
+            if (ch === '"' && line[i+1] === '"') { cur += '"'; i++; }
+            else if (ch === '"') { inQuotes = false; }
+            else { cur += ch; }
+          } else {
+            if (ch === '"') { inQuotes = true; }
+            else if (ch === ',') { result.push(cur); cur = ""; }
+            else { cur += ch; }
+          }
+        }
+        result.push(cur);
+        return result;
+      };
+
+      const headers = parseRow(lines[0]).map(h => h.trim());
+      const idx = (name: string) => headers.indexOf(name);
+
+      let added = 0, updated = 0, errors = 0;
+      for (let i = 1; i < lines.length; i++) {
+        try {
+          const cols = parseRow(lines[i]);
+          const get = (name: string) => (cols[idx(name)] ?? "").trim();
+
+          const barcode = get("barcode");
+          const name = get("name");
+          if (!name) continue; // skip empty rows
+
+          const imageUrlsRaw = get("imageUrls");
+          const imageUrls = imageUrlsRaw ? imageUrlsRaw.split("|").filter(Boolean) : [];
+
+          const payload: any = {
+            name,
+            category: get("category") || "Other",
+            price: Number(get("price")) || 0,
+            stock: Number(get("stock")) || 0,
+            description: get("description") || "",
+            barcode: barcode || `JSK-${Math.floor(100000 + Math.random() * 900000)}`,
+            imageUrls,
+            imageUrl: imageUrls[0] || "",
+            lowStockThreshold: Number(get("lowStockThreshold")) || 5,
+            updatedAt: serverTimestamp()
+          };
+          if (get("discountPrice")) payload.discountPrice = Number(get("discountPrice"));
+          if (get("purchasePrice")) payload.purchasePrice = Number(get("purchasePrice"));
+          if (get("cgst")) payload.cgst = Number(get("cgst"));
+          if (get("sgst")) payload.sgst = Number(get("sgst"));
+          if (get("igst")) payload.igst = Number(get("igst"));
+          if (get("size")) payload.size = get("size");
+          if (get("videoUrl")) payload.videoUrl = get("videoUrl");
+
+          // Match existing product by barcode
+          if (barcode) {
+            const existing = products.find(p => p.barcode === barcode);
+            if (existing) {
+              await updateDoc(doc(db, "products", existing.id), payload);
+              updated++;
+            } else {
+              await addDoc(collection(db, "products"), { ...payload, soldCount: 0, createdAt: serverTimestamp() });
+              added++;
+            }
+          } else {
+            await addDoc(collection(db, "products"), { ...payload, soldCount: 0, createdAt: serverTimestamp() });
+            added++;
+          }
+        } catch (rowErr) {
+          console.error(`Row ${i} error:`, rowErr);
+          errors++;
+        }
+      }
+
+      await fetchData();
+      alert(`✅ CSV Import Complete!\n\nAdded: ${added} products\nUpdated: ${updated} products${errors > 0 ? `\nErrors: ${errors} rows skip kiye` : ""}`);
+    } catch (err: any) {
+      console.error("CSV import error:", err);
+      alert("CSV import failed: " + (err?.message || "Unknown error"));
+    } finally {
+      setCsvImportLoading(false);
+    }
   };
 
   // Filtered Products for Inventory
@@ -1991,21 +2137,58 @@ export default function AdminDashboard() {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <h2 className="font-serif font-black text-2xl md:text-3xl text-amber-950">Product Inventory</h2>
                   {!showProductForm && (
-                    <button 
-                      onClick={() => {
-                        setProductForm({
-                          id: "", name: "", price: "", discountPrice: "", purchasePrice: "",
-                          cgst: defaultGst.cgst.toString(), sgst: defaultGst.sgst.toString(), igst: defaultGst.igst.toString(),
-                          stock: "", category: customCategories[0] || "Rings", description: "",
-                          lowStockThreshold: "5", size: "", videoUrl: "", barcode: getNextBarcode(), existingImageUrls: []
-                        });
-                        setImageFiles([]);
-                        setShowProductForm(true);
-                      }}
-                      className="bg-amber-800 hover:bg-amber-900 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
-                    >
-                      + Add New Product
-                    </button>
+                    <div className="flex flex-wrap gap-2 items-center">
+                      {/* Hidden CSV file input */}
+                      <input
+                        ref={csvImportRef}
+                        type="file"
+                        accept=".csv"
+                        className="hidden"
+                        onChange={handleImportProductsCSV}
+                      />
+
+                      {/* Import CSV Button */}
+                      <button
+                        type="button"
+                        onClick={() => csvImportRef.current?.click()}
+                        disabled={csvImportLoading}
+                        className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 disabled:bg-emerald-400 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
+                        title="CSV se sab products restore karo"
+                      >
+                        <Upload size={13} />
+                        {csvImportLoading ? "Importing..." : "Import CSV"}
+                      </button>
+
+                      {/* Export CSV Button */}
+                      <button
+                        type="button"
+                        onClick={handleExportProductsCSV}
+                        disabled={products.length === 0}
+                        className="flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 disabled:bg-blue-300 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
+                        title="Sab products CSV me download karo (backup)"
+                      >
+                        <FileText size={13} />
+                        Export CSV
+                      </button>
+
+                      {/* Add New Product Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProductForm({
+                            id: "", name: "", price: "", discountPrice: "", purchasePrice: "",
+                            cgst: defaultGst.cgst.toString(), sgst: defaultGst.sgst.toString(), igst: defaultGst.igst.toString(),
+                            stock: "", category: customCategories[0] || "Rings", description: "",
+                            lowStockThreshold: "5", size: "", videoUrl: "", barcode: getNextBarcode(), existingImageUrls: []
+                          });
+                          setImageFiles([]);
+                          setShowProductForm(true);
+                        }}
+                        className="bg-amber-800 hover:bg-amber-900 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-all cursor-pointer shadow-sm"
+                      >
+                        + Add New Product
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -2079,13 +2262,30 @@ export default function AdminDashboard() {
                       <label className="text-xs font-bold text-amber-900/70">Category</label>
                       <select
                         value={productForm.category}
-                        onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === "__custom__") return; // handled by text input below
+                          setProductForm({ ...productForm, category: val });
+                        }}
                         className="w-full border border-amber-200/80 rounded-xl px-3 py-2 text-sm bg-amber-50/10 focus:outline-none focus:ring-1 focus:ring-amber-500"
                       >
+                        {/* Always include existing category if not already in list */}
+                        {productForm.category && !customCategories.includes(productForm.category) && (
+                          <option value={productForm.category}>{productForm.category} (current)</option>
+                        )}
                         {customCategories.map(cat => (
                           <option key={cat} value={cat}>{cat}</option>
                         ))}
+                        <option value="__custom__">-- Type new category below --</option>
                       </select>
+                      {/* Free-text input: always visible so user can type any category */}
+                      <input
+                        type="text"
+                        value={productForm.category}
+                        onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
+                        className="w-full border border-amber-200/50 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-amber-400 mt-1"
+                        placeholder="Ya seedha type karo category naam..."
+                      />
                     </div>
 
                     <div className="space-y-1">
